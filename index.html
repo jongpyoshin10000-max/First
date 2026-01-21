@@ -339,6 +339,7 @@
         <div>점수: <span id="score">0</span></div>
         <div>최고기록: <span id="best">0</span></div>
         <div>코인: <span id="currency">0</span></div>
+        <div>부활권: <span id="revive-status">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
         <div>우산: <span id="umbrella-status">0</span></div>
       </div>
@@ -454,6 +455,7 @@
       const scoreEl = document.getElementById("score");
       const bestEl = document.getElementById("best");
       const currencyEl = document.getElementById("currency");
+      const reviveStatusEl = document.getElementById("revive-status");
       const menuCurrencyEl = document.getElementById("menu-currency");
       const menuTicketsEl = document.getElementById("menu-tickets");
       const menuUmbrellaEl = document.getElementById("menu-umbrella");
@@ -532,7 +534,8 @@
       const umbrellaKey = "rain-run-umbrella";
       state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
       state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
-      state.currency = Number.parseInt(safeStorage.getItem(currencyKey), 10) || 0;
+      const storedCurrency = safeStorage.getItem(currencyKey);
+      state.currency = storedCurrency === null ? 2000 : Number.parseInt(storedCurrency, 10) || 0;
       state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
       state.umbrellaInventory = Number.parseInt(safeStorage.getItem(umbrellaKey), 10) || 0;
 
@@ -626,6 +629,7 @@
 
       const updateCurrency = () => {
         currencyEl.textContent = state.currency;
+        reviveStatusEl.textContent = state.reviveTickets;
         menuCurrencyEl.textContent = state.currency;
         menuTicketsEl.textContent = state.reviveTickets;
         useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
@@ -914,6 +918,8 @@
           const inY = cloud.y > player.y - cloud.radius && cloud.y < player.y + size.height;
           if (inX && inY) {
             state.rainPauseUntil = Date.now() + 5000;
+            state.drops = [];
+            state.spawnTimer = 0;
             return false;
           }
           return true;
@@ -1024,16 +1030,13 @@
       const drawBolts = () => {
         state.bolts.forEach((bolt) => {
           const color = bolt.type === "yellow" ? "#ffd400" : "#55ff7a";
-          ctx.fillStyle = color;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(bolt.x, bolt.y, bolt.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#1f1f1f";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(bolt.x - 4, bolt.y - 6);
-          ctx.lineTo(bolt.x + 2, bolt.y);
-          ctx.lineTo(bolt.x - 2, bolt.y + 6);
+          ctx.moveTo(bolt.x - 6, bolt.y - 12);
+          ctx.lineTo(bolt.x + 2, bolt.y - 4);
+          ctx.lineTo(bolt.x - 4, bolt.y + 2);
+          ctx.lineTo(bolt.x + 6, bolt.y + 12);
           ctx.stroke();
         });
       };
