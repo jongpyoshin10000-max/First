@@ -359,6 +359,7 @@
               <button id="use-revive" type="button">부활권 사용</button>
               <button id="restart" type="button">다시 도전</button>
               <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
+              <button id="shop-from-result" type="button" class="button--ghost">상점</button>
               <button id="fullscreen-result" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
@@ -411,6 +412,7 @@
       const useReviveButton = document.getElementById("use-revive");
       const historyButton = document.getElementById("history");
       const historyFromResultButton = document.getElementById("history-from-result");
+      const shopFromResultButton = document.getElementById("shop-from-result");
       const shopButton = document.getElementById("shop");
       const shopModal = document.getElementById("shop-modal");
       const closeShopButton = document.getElementById("close-shop");
@@ -436,6 +438,7 @@
         running: false,
         drops: [],
         shields: [],
+        coins: [],
         player: {
           x: 0,
           y: 0,
@@ -445,6 +448,7 @@
         lastTime: 0,
         spawnTimer: 0,
         shieldTimer: 0,
+        coinTimer: 0,
         score: 0,
         best: 0,
         currency: 0,
@@ -500,6 +504,9 @@
         maxExtraDrops: 3,
         shieldInterval: 9000,
         shieldRadius: 12,
+        coinInterval: 7000,
+        coinRadius: 12,
+        coinValues: [100, 200, 300, 500],
         reviveCost: 500,
         slowDuration: 5000,
         slowFactor: 0.6,
@@ -539,10 +546,12 @@
         state.speedMultiplier = 1;
         state.spawnTimer = 0;
         state.shieldTimer = 0;
+        state.coinTimer = 0;
         state.dropsDodged = 0;
         state.speedBonus = 0;
         state.difficultyTier = 0;
         state.shields = [];
+        state.coins = [];
         state.shieldActiveUntil = 0;
         state.shieldCharges = 0;
         state.lastTime = performance.now();
@@ -661,6 +670,20 @@
         });
       };
 
+      const spawnCoin = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.coinRadius;
+        const value =
+          settings.coinValues[Math.floor(Math.random() * settings.coinValues.length)];
+        state.coins.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 200 + Math.random() * 80,
+          value,
+        });
+      };
+
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
@@ -686,12 +709,22 @@
           spawnShield();
         }
 
+        state.coinTimer += delta;
+        if (state.coinTimer > settings.coinInterval) {
+          state.coinTimer -= settings.coinInterval;
+          spawnCoin();
+        }
+
         state.drops.forEach((drop) => {
           drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
         });
 
         state.shields.forEach((shield) => {
           shield.y += (shield.speed * delta) / 1000;
+        });
+
+        state.coins.forEach((coin) => {
+          coin.y += (coin.speed * delta) / 1000;
         });
 
         const { height } = canvas.getBoundingClientRect();
@@ -704,6 +737,7 @@
         });
 
         state.shields = state.shields.filter((shield) => shield.y < height + shield.radius);
+        state.coins = state.coins.filter((coin) => coin.y < height + coin.radius);
         if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
           state.shieldCharges = 0;
           state.shieldActiveUntil = 0;
@@ -723,6 +757,18 @@
               state.shieldActiveUntil = baseTime + 30000;
             }
             updateShieldStatus();
+            return false;
+          }
+          return true;
+        });
+
+        state.coins = state.coins.filter((coin) => {
+          const inX = coin.x > player.x && coin.x < player.x + player.width;
+          const inY = coin.y > player.y - coin.radius && coin.y < player.y + player.height;
+          if (inX && inY) {
+            state.currency += coin.value;
+            safeStorage.setItem(currencyKey, String(state.currency));
+            updateCurrency();
             return false;
           }
           return true;
@@ -779,6 +825,23 @@
         });
       };
 
+      const drawCoins = () => {
+        state.coins.forEach((coin) => {
+          ctx.fillStyle = "#ffd26a";
+          ctx.beginPath();
+          ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffb703";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = "#1f1400";
+          ctx.font = "12px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(coin.value), coin.x, coin.y);
+        });
+      };
+
       const drawPlayer = () => {
         const { player } = state;
         ctx.fillStyle = "#ffe96b";
@@ -801,6 +864,7 @@
         drawBackground();
         drawDrops();
         drawShields();
+        drawCoins();
         drawPlayer();
         updateScore();
 
@@ -926,6 +990,7 @@
       historyButton.addEventListener("click", openHistory);
       historyFromResultButton.addEventListener("click", openHistory);
       shopButton.addEventListener("click", openShop);
+      shopFromResultButton.addEventListener("click", openShop);
       buyReviveButton.addEventListener("click", buyRevive);
       closeShopButton.addEventListener("click", closeShop);
       shopModal.addEventListener("click", (event) => {
