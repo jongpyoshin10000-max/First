@@ -619,6 +619,7 @@
         state.bolts = [];
         state.shieldActiveUntil = 0;
         state.shieldCharges = 0;
+        state.umbrellaActive = 0;
         state.sizeMultiplier = 1;
         state.sizeEffectUntil = 0;
         state.rainPauseUntil = 0;
@@ -696,14 +697,12 @@
       const startGame = () => {
         state.running = true;
         resetGame({ preserveScore: state.pendingPreserveScore });
-        if (!state.pendingPreserveScore) {
-          const usableUmbrellas = Math.min(state.umbrellaToUse, state.umbrellaInventory);
-          state.umbrellaInventory -= usableUmbrellas;
-          state.umbrellaActive = usableUmbrellas;
-          state.umbrellaToUse = 0;
-          safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
-          updateCurrency();
-        }
+        const usableUmbrellas = Math.min(state.umbrellaToUse, state.umbrellaInventory);
+        state.umbrellaInventory -= usableUmbrellas;
+        state.umbrellaActive = usableUmbrellas;
+        state.umbrellaToUse = 0;
+        safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
+        updateCurrency();
         if (state.pendingSlowStart) {
           state.slowUntil = Date.now() + settings.slowDuration;
           state.pendingSlowStart = false;
@@ -899,6 +898,15 @@
         height: state.player.height * state.sizeMultiplier,
       });
 
+      const applyBoltEffect = (type) => {
+        if (type === "yellow") {
+          state.sizeMultiplier = state.sizeMultiplier >= 1.5 ? 1 : 0.5;
+        } else {
+          state.sizeMultiplier = state.sizeMultiplier <= 0.5 ? 1 : 1.5;
+        }
+        state.sizeEffectUntil = Date.now() + settings.boltDuration;
+      };
+
       const checkCollision = () => {
         const { player } = state;
         const size = getPlayerSize();
@@ -949,12 +957,7 @@
           const inX = bolt.x > player.x && bolt.x < player.x + size.width;
           const inY = bolt.y > player.y - bolt.radius && bolt.y < player.y + size.height;
           if (inX && inY) {
-            if (bolt.type === "yellow") {
-              state.sizeMultiplier = 0.5;
-            } else {
-              state.sizeMultiplier = 1.5;
-            }
-            state.sizeEffectUntil = Date.now() + settings.boltDuration;
+            applyBoltEffect(bolt.type);
             return false;
           }
           return true;
