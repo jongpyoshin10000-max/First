@@ -160,6 +160,34 @@
         text-align: right;
       }
 
+      .control {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .control__label {
+        color: #b8c6e6;
+        font-size: 0.95rem;
+      }
+
+      .control__pad {
+        height: 80px;
+        border-radius: 16px;
+        background: rgba(98, 210, 255, 0.12);
+        border: 1px dashed rgba(98, 210, 255, 0.5);
+        position: relative;
+        touch-action: none;
+      }
+
+      .control__pad::after {
+        content: "";
+        position: absolute;
+        inset: 12px;
+        border-radius: 12px;
+        background: rgba(98, 210, 255, 0.08);
+      }
+
       .modal {
         position: fixed;
         inset: 0;
@@ -254,6 +282,7 @@
             <div class="menu__actions">
               <button id="start" type="button">게임 시작</button>
               <button id="history" type="button" class="button--ghost">기록 보기</button>
+              <button id="fullscreen" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
           <div id="countdown" class="countdown" aria-live="polite"></div>
@@ -263,13 +292,19 @@
             <div class="menu__actions">
               <button id="restart" type="button">다시 도전</button>
               <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
+              <button id="fullscreen-result" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
         </div>
       </div>
 
+      <div class="control">
+        <div class="control__label">여기에서 드래그하여 이동</div>
+        <div id="control-pad" class="control__pad"></div>
+      </div>
+
       <footer class="game__footer">
-        <p>팁: 화면 어디를 터치해도 캐릭터가 따라갑니다.</p>
+        <p>팁: 하단 패드를 드래그해서 이동해보세요.</p>
       </footer>
     </div>
 
@@ -291,6 +326,9 @@
       const restartButton = document.getElementById("restart");
       const historyButton = document.getElementById("history");
       const historyFromResultButton = document.getElementById("history-from-result");
+      const fullscreenButton = document.getElementById("fullscreen");
+      const fullscreenResultButton = document.getElementById("fullscreen-result");
+      const controlPad = document.getElementById("control-pad");
       const menu = document.getElementById("menu");
       const countdownEl = document.getElementById("countdown");
       const resultPanel = document.getElementById("result");
@@ -323,8 +361,9 @@
         shieldActiveUntil: 0,
         shieldCharges: 0,
         countdownTimer: null,
-        countdownValue: 5,
+        countdownValue: 3,
         history: [],
+        dragging: false,
       };
 
       const safeStorage = {
@@ -425,7 +464,7 @@
           clearInterval(state.countdownTimer);
         }
         overlay.classList.add("overlay--visible");
-        state.countdownValue = 5;
+        state.countdownValue = 3;
         showCountdown(state.countdownValue);
         state.countdownTimer = setInterval(() => {
           state.countdownValue -= 1;
@@ -496,7 +535,7 @@
         state.score += delta * 0.01;
         state.difficultyTier = Math.floor(state.score / 100);
         state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
-        state.speedMultiplier = 1 + state.score / 120 + state.speedBonus;
+        state.speedMultiplier = 1 + state.speedBonus;
         const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
         const spawnInterval = settings.spawnInterval / intervalScale;
 
@@ -566,16 +605,12 @@
           }
           if (state.shieldCharges > 0) {
             state.shieldCharges = 0;
+            state.shieldActiveUntil = 0;
             updateShieldStatus();
             drop.y = canvas.getBoundingClientRect().height + drop.height;
             return false;
           }
-          return (
-            drop.x < player.x + player.width &&
-            drop.x + drop.width > player.x &&
-            dropBottom > player.y &&
-            drop.y < playerBottom
-          );
+          return true;
         });
       };
 
@@ -641,16 +676,39 @@
         requestAnimationFrame(loop);
       };
 
-      const handleMove = (event) => {
-        if (!state.running) return;
+      const movePlayerFromX = (clientX) => {
         const { width } = canvas.getBoundingClientRect();
-        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const rect = canvas.getBoundingClientRect();
         const x = clientX - rect.left;
         state.player.x = Math.max(
           0,
           Math.min(width - state.player.width, x - state.player.width / 2)
         );
+      };
+
+      const handleDragStart = (event) => {
+        if (!state.running) return;
+        state.dragging = true;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        movePlayerFromX(clientX);
+      };
+
+      const handleDragMove = (event) => {
+        if (!state.running || !state.dragging) return;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        movePlayerFromX(clientX);
+      };
+
+      const handleDragEnd = () => {
+        state.dragging = false;
+      };
+
+      const toggleFullscreen = async () => {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          return;
+        }
+        await document.documentElement.requestFullscreen();
       };
 
       const renderHistory = () => {
@@ -681,14 +739,20 @@
 
       window.addEventListener("resize", resizeCanvas);
 
-      canvas.addEventListener("mousemove", handleMove);
-      canvas.addEventListener("touchmove", handleMove, { passive: true });
+      controlPad.addEventListener("mousedown", handleDragStart);
+      controlPad.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+      controlPad.addEventListener("touchstart", handleDragStart, { passive: true });
+      controlPad.addEventListener("touchmove", handleDragMove, { passive: true });
+      controlPad.addEventListener("touchend", handleDragEnd);
       startButton.addEventListener("click", startCountdown);
       startButton.addEventListener("touchstart", startCountdown, { passive: true });
       restartButton.addEventListener("click", startCountdown);
       restartButton.addEventListener("touchstart", startCountdown, { passive: true });
       historyButton.addEventListener("click", openHistory);
       historyFromResultButton.addEventListener("click", openHistory);
+      fullscreenButton.addEventListener("click", toggleFullscreen);
+      fullscreenResultButton.addEventListener("click", toggleFullscreen);
       closeHistory.addEventListener("click", closeHistoryModal);
       historyModal.addEventListener("click", (event) => {
         if (event.target === historyModal) {
