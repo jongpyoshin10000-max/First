@@ -90,14 +90,42 @@
         pointer-events: auto;
       }
 
-      .overlay h2 {
+      .overlay h2,
+      .result h2 {
         margin: 0;
         font-size: clamp(1.5rem, 3vw, 2.1rem);
       }
 
-      .overlay p {
+      .overlay p,
+      .result p {
         margin: 0;
         color: #d0ddf5;
+      }
+
+      .menu,
+      .result {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .menu--active,
+      .result--active {
+        display: flex;
+      }
+
+      .menu__actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .countdown {
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        font-weight: 800;
+        letter-spacing: 0.1em;
       }
 
       button {
@@ -116,9 +144,91 @@
         background: #8be0ff;
       }
 
+      .button--ghost {
+        background: transparent;
+        color: #e8f2ff;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        box-shadow: none;
+      }
+
+      .button--ghost:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
       .game__footer {
         color: #9eb2d6;
         text-align: right;
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(5, 8, 16, 0.75);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      .modal--open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal__content {
+        width: min(520px, 100%);
+        background: #0e1426;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      .modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .modal__header h3 {
+        margin: 0;
+      }
+
+      .modal__close {
+        background: transparent;
+        color: #cfe1ff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: none;
+      }
+
+      .history-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+
+      .history-list li {
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        color: #d9e6ff;
+        font-size: 0.95rem;
+      }
+
+      .history-list span {
+        color: #7fd3ff;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -137,9 +247,23 @@
       <div class="stage">
         <canvas id="rain-canvas" aria-label="비사이로 막가 게임 화면"></canvas>
         <div id="overlay" class="overlay overlay--visible">
-          <h2>터치로 이동!</h2>
-          <p>비사이를 빠르게 피해서 최대한 오래 버텨보세요.</p>
-          <button id="start" type="button">시작하기</button>
+          <div id="menu" class="menu">
+            <h2>비사이로 막가</h2>
+            <p>비사이를 터치로 피하고 최대한 오래 버텨보세요.</p>
+            <div class="menu__actions">
+              <button id="start" type="button">게임 시작</button>
+              <button id="history" type="button" class="button--ghost">기록 보기</button>
+            </div>
+          </div>
+          <div id="countdown" class="countdown" aria-live="polite"></div>
+          <div id="result" class="result">
+            <h2>비를 맞았어요!</h2>
+            <p>다시 시작해서 비사이를 가볍게 통과해봐요.</p>
+            <div class="menu__actions">
+              <button id="restart" type="button">다시 도전</button>
+              <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -148,11 +272,30 @@
       </footer>
     </div>
 
+    <div id="history-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>나의 기록</h3>
+          <button id="close-history" class="modal__close" type="button">닫기</button>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+      </div>
+    </div>
+
     <script>
       const canvas = document.getElementById("rain-canvas");
       const ctx = canvas.getContext("2d");
       const overlay = document.getElementById("overlay");
       const startButton = document.getElementById("start");
+      const restartButton = document.getElementById("restart");
+      const historyButton = document.getElementById("history");
+      const historyFromResultButton = document.getElementById("history-from-result");
+      const menu = document.getElementById("menu");
+      const countdownEl = document.getElementById("countdown");
+      const resultPanel = document.getElementById("result");
+      const historyModal = document.getElementById("history-modal");
+      const historyList = document.getElementById("history-list");
+      const closeHistory = document.getElementById("close-history");
       const scoreEl = document.getElementById("score");
       const bestEl = document.getElementById("best");
 
@@ -170,6 +313,11 @@
         score: 0,
         best: 0,
         speedMultiplier: 1,
+        dropsDodged: 0,
+        speedBonus: 0,
+        countdownTimer: null,
+        countdownValue: 5,
+        history: [],
       };
 
       const safeStorage = {
@@ -190,7 +338,9 @@
       };
 
       const bestScoreKey = "rain-run-best";
+      const historyKey = "rain-run-history";
       state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
+      state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
 
       const settings = {
         spawnInterval: 520,
@@ -198,6 +348,25 @@
         maxDropSpeed: 420,
         dropWidthRange: [12, 22],
         dropHeight: 36,
+        speedStep: 0.08,
+      };
+
+      const showMenu = () => {
+        menu.classList.add("menu--active");
+        resultPanel.classList.remove("result--active");
+        countdownEl.textContent = "";
+      };
+
+      const showResult = () => {
+        menu.classList.remove("menu--active");
+        resultPanel.classList.add("result--active");
+        countdownEl.textContent = "";
+      };
+
+      const showCountdown = (value) => {
+        menu.classList.remove("menu--active");
+        resultPanel.classList.remove("result--active");
+        countdownEl.textContent = value;
       };
 
       const resizeCanvas = () => {
@@ -215,6 +384,8 @@
         state.score = 0;
         state.speedMultiplier = 1;
         state.spawnTimer = 0;
+        state.dropsDodged = 0;
+        state.speedBonus = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -224,12 +395,27 @@
         bestEl.textContent = Math.floor(state.best);
       };
 
+      const startCountdown = () => {
+        if (state.countdownTimer) {
+          clearInterval(state.countdownTimer);
+        }
+        overlay.classList.add("overlay--visible");
+        state.countdownValue = 5;
+        showCountdown(state.countdownValue);
+        state.countdownTimer = setInterval(() => {
+          state.countdownValue -= 1;
+          if (state.countdownValue <= 0) {
+            clearInterval(state.countdownTimer);
+            state.countdownTimer = null;
+            overlay.classList.remove("overlay--visible");
+            startGame();
+            return;
+          }
+          showCountdown(state.countdownValue);
+        }, 1000);
+      };
+
       const startGame = () => {
-        overlay.querySelector("h2").textContent = "터치로 이동!";
-        overlay.querySelector("p").textContent =
-          "비사이를 빠르게 피해서 최대한 오래 버텨보세요.";
-        startButton.textContent = "시작하기";
-        overlay.classList.remove("overlay--visible");
         state.running = true;
         resetGame();
         requestAnimationFrame(loop);
@@ -239,12 +425,17 @@
         state.running = false;
         state.best = Math.max(state.best, state.score);
         safeStorage.setItem(bestScoreKey, String(state.best));
+        const runRecord = {
+          score: Math.floor(state.score),
+          drops: state.dropsDodged,
+          date: new Date().toLocaleString(),
+        };
+        state.history.unshift(runRecord);
+        state.history = state.history.slice(0, 20);
+        safeStorage.setItem(historyKey, JSON.stringify(state.history));
         updateScore();
         overlay.classList.add("overlay--visible");
-        overlay.querySelector("h2").textContent = "비를 맞았어요!";
-        overlay.querySelector("p").textContent =
-          "다시 시작해서 비사이를 가볍게 통과해봐요.";
-        startButton.textContent = "다시 도전";
+        showResult();
       };
 
       const spawnDrop = () => {
@@ -267,7 +458,7 @@
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
-        state.speedMultiplier = 1 + state.score / 120;
+        state.speedMultiplier = 1 + state.score / 120 + state.speedBonus;
 
         if (state.spawnTimer > settings.spawnInterval) {
           state.spawnTimer = 0;
@@ -279,7 +470,16 @@
         });
 
         const { height } = canvas.getBoundingClientRect();
-        state.drops = state.drops.filter((drop) => drop.y < height);
+        state.drops = state.drops.filter((drop) => {
+          if (drop.y < height) {
+            return true;
+          }
+          state.dropsDodged += 1;
+          if (state.dropsDodged % 100 === 0) {
+            state.speedBonus += settings.speedStep;
+          }
+          return false;
+        });
       };
 
       const checkCollision = () => {
@@ -352,15 +552,52 @@
         );
       };
 
+      const renderHistory = () => {
+        historyList.innerHTML = "";
+        if (!state.history.length) {
+          const emptyItem = document.createElement("li");
+          emptyItem.textContent = "아직 기록이 없어요.";
+          historyList.appendChild(emptyItem);
+          return;
+        }
+        state.history.forEach((record) => {
+          const item = document.createElement("li");
+          item.innerHTML = `<div>${record.date}</div><span>${record.score}점 · ${record.drops}회</span>`;
+          historyList.appendChild(item);
+        });
+      };
+
+      const openHistory = () => {
+        renderHistory();
+        historyModal.classList.add("modal--open");
+        historyModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeHistoryModal = () => {
+        historyModal.classList.remove("modal--open");
+        historyModal.setAttribute("aria-hidden", "true");
+      };
+
       window.addEventListener("resize", resizeCanvas);
 
       canvas.addEventListener("mousemove", handleMove);
       canvas.addEventListener("touchmove", handleMove, { passive: true });
-      startButton.addEventListener("click", startGame);
-      startButton.addEventListener("touchstart", startGame, { passive: true });
+      startButton.addEventListener("click", startCountdown);
+      startButton.addEventListener("touchstart", startCountdown, { passive: true });
+      restartButton.addEventListener("click", startCountdown);
+      restartButton.addEventListener("touchstart", startCountdown, { passive: true });
+      historyButton.addEventListener("click", openHistory);
+      historyFromResultButton.addEventListener("click", openHistory);
+      closeHistory.addEventListener("click", closeHistoryModal);
+      historyModal.addEventListener("click", (event) => {
+        if (event.target === historyModal) {
+          closeHistoryModal();
+        }
+      });
 
       resizeCanvas();
       updateScore();
+      showMenu();
     </script>
   </body>
 </html>
