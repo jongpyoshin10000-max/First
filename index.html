@@ -381,6 +381,7 @@
             <div class="menu__actions">
               <button id="use-revive" type="button">부활권 사용</button>
               <button id="restart" type="button">다시 도전</button>
+              <button id="back-to-menu" type="button" class="button--ghost">처음으로</button>
               <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
               <button id="shop-from-result" type="button" class="button--ghost">상점</button>
               <button id="fullscreen-result" type="button" class="button--ghost">전체화면</button>
@@ -439,6 +440,7 @@
       const overlay = document.getElementById("overlay");
       const startButton = document.getElementById("start");
       const restartButton = document.getElementById("restart");
+      const backToMenuButton = document.getElementById("back-to-menu");
       const useReviveButton = document.getElementById("use-revive");
       const historyButton = document.getElementById("history");
       const historyFromResultButton = document.getElementById("history-from-result");
@@ -564,7 +566,7 @@
         coinValues: [100, 200, 300, 500],
         cloudInterval: 12000,
         boltInterval: 11000,
-        cloudRadius: 20,
+        cloudRadius: 10,
         boltRadius: 12,
         boltDuration: 60000,
         cloudSlowDuration: 3000,
@@ -1277,6 +1279,11 @@
         startCountdown({ slowStart: false });
       };
 
+      const handleBackToMenu = () => {
+        overlay.classList.add("overlay--visible");
+        showMenu();
+      };
+
       startButton.addEventListener("click", handleStart);
       startButton.addEventListener("touchstart", handleStart, { passive: true });
       restartButton.addEventListener("click", () => startCountdown({ slowStart: true }));
@@ -1284,6 +1291,7 @@
         passive: true,
       });
       useReviveButton.addEventListener("click", useRevive);
+      backToMenuButton.addEventListener("click", handleBackToMenu);
       umbrellaDecreaseButton.addEventListener("click", () => adjustUmbrellaToUse(-1));
       umbrellaIncreaseButton.addEventListener("click", () => adjustUmbrellaToUse(1));
       historyButton.addEventListener("click", openHistory);
