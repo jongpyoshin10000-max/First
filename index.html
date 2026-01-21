@@ -242,6 +242,7 @@
       <div class="hud">
         <div>점수: <span id="score">0</span></div>
         <div>최고기록: <span id="best">0</span></div>
+        <div>보호막: <span id="shield-status">없음</span></div>
       </div>
 
       <div class="stage">
@@ -298,10 +299,12 @@
       const closeHistory = document.getElementById("close-history");
       const scoreEl = document.getElementById("score");
       const bestEl = document.getElementById("best");
+      const shieldStatusEl = document.getElementById("shield-status");
 
       const state = {
         running: false,
         drops: [],
+        shields: [],
         player: {
           x: 0,
           y: 0,
@@ -310,12 +313,15 @@
         },
         lastTime: 0,
         spawnTimer: 0,
+        shieldTimer: 0,
         score: 0,
         best: 0,
         speedMultiplier: 1,
         dropsDodged: 0,
         speedBonus: 0,
         difficultyTier: 0,
+        shieldActiveUntil: 0,
+        shieldCharges: 0,
         countdownTimer: null,
         countdownValue: 5,
         history: [],
@@ -352,6 +358,8 @@
         speedStep: 0.04,
         spawnScale: 0.2,
         maxExtraDrops: 3,
+        shieldInterval: 9000,
+        shieldRadius: 12,
       };
 
       const showMenu = () => {
@@ -387,9 +395,13 @@
         state.score = 0;
         state.speedMultiplier = 1;
         state.spawnTimer = 0;
+        state.shieldTimer = 0;
         state.dropsDodged = 0;
         state.speedBonus = 0;
         state.difficultyTier = 0;
+        state.shields = [];
+        state.shieldActiveUntil = 0;
+        state.shieldCharges = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -397,6 +409,15 @@
       const updateScore = () => {
         scoreEl.textContent = Math.floor(state.score);
         bestEl.textContent = Math.floor(state.best);
+      };
+
+      const updateShieldStatus = () => {
+        if (state.shieldCharges > 0) {
+          const remaining = Math.max(0, Math.ceil((state.shieldActiveUntil - Date.now()) / 1000));
+          shieldStatusEl.textContent = `${remaining}s`;
+          return;
+        }
+        shieldStatusEl.textContent = "없음";
       };
 
       const startCountdown = () => {
@@ -459,6 +480,17 @@
         });
       };
 
+      const spawnShield = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.shieldRadius;
+        state.shields.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 180 + Math.random() * 80,
+        });
+      };
+
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
@@ -477,8 +509,18 @@
           }
         }
 
+        state.shieldTimer += delta;
+        if (state.shieldTimer > settings.shieldInterval) {
+          state.shieldTimer -= settings.shieldInterval;
+          spawnShield();
+        }
+
         state.drops.forEach((drop) => {
           drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
+        });
+
+        state.shields.forEach((shield) => {
+          shield.y += (shield.speed * delta) / 1000;
         });
 
         const { height } = canvas.getBoundingClientRect();
@@ -489,13 +531,45 @@
           state.dropsDodged += 1;
           return false;
         });
+
+        state.shields = state.shields.filter((shield) => shield.y < height + shield.radius);
+        if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
+          state.shieldCharges = 0;
+        }
+        updateShieldStatus();
       };
 
       const checkCollision = () => {
         const { player } = state;
+        state.shields = state.shields.filter((shield) => {
+          const inX = shield.x > player.x && shield.x < player.x + player.width;
+          const inY = shield.y > player.y - shield.radius && shield.y < player.y + player.height;
+          if (inX && inY) {
+            state.shieldCharges = 1;
+            state.shieldActiveUntil = Date.now() + 30000;
+            updateShieldStatus();
+            return false;
+          }
+          return true;
+        });
+
         return state.drops.some((drop) => {
           const dropBottom = drop.y + drop.height;
           const playerBottom = player.y + player.height;
+          const isHit =
+            drop.x < player.x + player.width &&
+            drop.x + drop.width > player.x &&
+            dropBottom > player.y &&
+            drop.y < playerBottom;
+          if (!isHit) {
+            return false;
+          }
+          if (state.shieldCharges > 0) {
+            state.shieldCharges = 0;
+            updateShieldStatus();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
           return (
             drop.x < player.x + player.width &&
             drop.x + drop.width > player.x &&
@@ -522,12 +596,29 @@
         });
       };
 
+      const drawShields = () => {
+        ctx.fillStyle = "#7dffea";
+        state.shields.forEach((shield) => {
+          ctx.beginPath();
+          ctx.arc(shield.x, shield.y, shield.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#2bffe0";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+      };
+
       const drawPlayer = () => {
         const { player } = state;
         ctx.fillStyle = "#ffe96b";
         ctx.fillRect(player.x, player.y, player.width, player.height);
         ctx.fillStyle = "#2c3050";
         ctx.fillRect(player.x + player.width * 0.4, player.y - 14, 8, 14);
+        if (state.shieldCharges > 0) {
+          ctx.strokeStyle = "#7dffea";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(player.x - 6, player.y - 6, player.width + 12, player.height + 12);
+        }
       };
 
       const loop = (time) => {
@@ -538,6 +629,7 @@
         update(delta);
         drawBackground();
         drawDrops();
+        drawShields();
         drawPlayer();
         updateScore();
 
