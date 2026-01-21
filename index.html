@@ -315,6 +315,7 @@
         speedMultiplier: 1,
         dropsDodged: 0,
         speedBonus: 0,
+        difficultyTier: 0,
         countdownTimer: null,
         countdownValue: 5,
         history: [],
@@ -348,7 +349,9 @@
         maxDropSpeed: 420,
         dropWidthRange: [12, 22],
         dropHeight: 36,
-        speedStep: 0.08,
+        speedStep: 0.04,
+        spawnScale: 0.2,
+        maxExtraDrops: 3,
       };
 
       const showMenu = () => {
@@ -386,6 +389,7 @@
         state.spawnTimer = 0;
         state.dropsDodged = 0;
         state.speedBonus = 0;
+        state.difficultyTier = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -458,11 +462,19 @@
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
+        state.difficultyTier = Math.floor(state.score / 100);
+        state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
         state.speedMultiplier = 1 + state.score / 120 + state.speedBonus;
+        const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
+        const spawnInterval = settings.spawnInterval / intervalScale;
 
-        if (state.spawnTimer > settings.spawnInterval) {
-          state.spawnTimer = 0;
+        if (state.spawnTimer > spawnInterval) {
+          state.spawnTimer -= spawnInterval;
           spawnDrop();
+          const extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
+          for (let i = 0; i < extraDrops; i += 1) {
+            spawnDrop();
+          }
         }
 
         state.drops.forEach((drop) => {
@@ -475,9 +487,6 @@
             return true;
           }
           state.dropsDodged += 1;
-          if (state.dropsDodged % 100 === 0) {
-            state.speedBonus += settings.speedStep;
-          }
           return false;
         });
       };
