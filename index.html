@@ -640,7 +640,8 @@
         menuTicketsEl.textContent = state.reviveTickets;
         useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
         menuUmbrellaEl.textContent = state.umbrellaInventory;
-        umbrellaStatusEl.textContent = state.umbrellaActive;
+        umbrellaStatusEl.textContent =
+          state.umbrellaActive > 0 ? state.umbrellaActive : state.umbrellaInventory;
         if (state.umbrellaActive > 0) {
           umbrellaStatusEl.style.color = getShieldColor(state.umbrellaActive);
         } else {
@@ -1234,6 +1235,19 @@
 
       const useRevive = () => {
         if (state.reviveTickets < 1) return;
+        let applyUmbrella = false;
+        if (state.umbrellaInventory > 0) {
+          applyUmbrella = window.confirm("우산을 적용하고 부활할까요?");
+        }
+        if (applyUmbrella) {
+          state.umbrellaToUse = Math.min(
+            state.umbrellaToUse || state.umbrellaInventory,
+            state.umbrellaInventory,
+            settings.umbrellaMaxStack
+          );
+        } else {
+          state.umbrellaToUse = 0;
+        }
         state.reviveTickets -= 1;
         safeStorage.setItem(reviveKey, String(state.reviveTickets));
         updateCurrency();
