@@ -501,6 +501,7 @@
         sizeEffectUntil: 0,
         slowUntil: 0,
         rainPauseUntil: 0,
+        rainResumeSlowUntil: 0,
         runAwardedScore: 0,
         countdownTimer: null,
         countdownValue: 3,
@@ -558,9 +559,12 @@
         cloudRadius: 20,
         boltRadius: 12,
         boltDuration: 60000,
+        cloudSlowDuration: 3000,
+        cloudSlowFactor: 0.6,
+        shieldMaxStack: 7,
         reviveCost: 500,
         umbrellaCost: 300,
-        umbrellaMaxStack: 5,
+        umbrellaMaxStack: 7,
         slowDuration: 5000,
         slowFactor: 0.6,
       };
@@ -618,6 +622,7 @@
         state.sizeMultiplier = 1;
         state.sizeEffectUntil = 0;
         state.rainPauseUntil = 0;
+        state.rainResumeSlowUntil = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -643,8 +648,16 @@
       };
 
       const getShieldColor = (charges) => {
-        const palette = ["#7dffea", "#8cff7d", "#ffe36b", "#ffb86b", "#ff7db7"];
-        return palette[Math.min(charges, palette.length) - 1] || "#7dffea";
+        const palette = [
+          "#ff3b30",
+          "#ff9500",
+          "#ffd60a",
+          "#34c759",
+          "#32ade6",
+          "#5856d6",
+          "#af52de",
+        ];
+        return palette[Math.min(charges, palette.length) - 1] || "#ff3b30";
       };
 
       const updateShieldStatus = () => {
@@ -794,9 +807,12 @@
         state.difficultyTier = Math.floor(state.score / 100);
         state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
         const slowFactor = Date.now() < state.slowUntil ? settings.slowFactor : 1;
-        state.speedMultiplier = (1 + state.speedBonus) * slowFactor;
+        const cloudSlowFactor =
+          Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
+        const totalSlowFactor = slowFactor * cloudSlowFactor;
+        state.speedMultiplier = (1 + state.speedBonus) * totalSlowFactor;
         const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
-        const spawnInterval = (settings.spawnInterval / intervalScale) / slowFactor;
+        const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
 
         const isRainPaused = Date.now() < state.rainPauseUntil;
         if (!isRainPaused && state.spawnTimer > spawnInterval) {
@@ -890,7 +906,10 @@
           const inX = shield.x > player.x && shield.x < player.x + size.width;
           const inY = shield.y > player.y - shield.radius && shield.y < player.y + size.height;
           if (inX && inY) {
-            if (state.shieldCharges < 5) {
+            if (state.umbrellaActive > 0) {
+              return false;
+            }
+            if (state.shieldCharges < settings.shieldMaxStack) {
               state.shieldCharges += 1;
               const baseTime = Math.max(Date.now(), state.shieldActiveUntil);
               state.shieldActiveUntil = baseTime + 30000;
@@ -918,6 +937,7 @@
           const inY = cloud.y > player.y - cloud.radius && cloud.y < player.y + size.height;
           if (inX && inY) {
             state.rainPauseUntil = Date.now() + 5000;
+            state.rainResumeSlowUntil = state.rainPauseUntil + settings.cloudSlowDuration;
             state.drops = [];
             state.spawnTimer = 0;
             return false;
@@ -951,18 +971,18 @@
           if (!isHit) {
             return false;
           }
+          if (state.umbrellaActive > 0) {
+            state.umbrellaActive -= 1;
+            updateCurrency();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
           if (state.shieldCharges > 0) {
             state.shieldCharges -= 1;
             if (state.shieldCharges === 0) {
               state.shieldActiveUntil = 0;
             }
             updateShieldStatus();
-            drop.y = canvas.getBoundingClientRect().height + drop.height;
-            return false;
-          }
-          if (state.umbrellaActive > 0) {
-            state.umbrellaActive -= 1;
-            updateCurrency();
             drop.y = canvas.getBoundingClientRect().height + drop.height;
             return false;
           }
@@ -1048,10 +1068,21 @@
         ctx.fillRect(player.x, player.y, size.width, size.height);
         ctx.fillStyle = "#2c3050";
         ctx.fillRect(player.x + size.width * 0.4, player.y - 14, 8, 14);
-        if (state.shieldCharges > 0) {
+        if (state.shieldCharges > 0 && state.umbrellaActive === 0) {
           ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 3;
           ctx.strokeRect(player.x - 6, player.y - 6, size.width + 12, size.height + 12);
+        }
+        if (state.umbrellaActive > 0) {
+          ctx.strokeStyle = "#7bb7ff";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(player.x + size.width / 2, player.y - 12, 18, Math.PI, 0);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(player.x + size.width / 2, player.y - 12);
+          ctx.lineTo(player.x + size.width / 2, player.y + 6);
+          ctx.stroke();
         }
       };
 
@@ -1170,7 +1201,7 @@
           return;
         }
         if (state.umbrellaInventory >= settings.umbrellaMaxStack) {
-          setShopMessage("우산은 최대 5개까지 보유할 수 있어요.");
+          setShopMessage("우산은 최대 7개까지 보유할 수 있어요.");
           return;
         }
         state.currency -= settings.umbrellaCost;
