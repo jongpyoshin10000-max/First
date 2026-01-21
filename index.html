@@ -234,6 +234,11 @@
         flex-wrap: wrap;
       }
 
+      .status-list__message {
+        color: #9fb5e0;
+        font-size: 0.85rem;
+      }
+
       .shop-item {
         display: flex;
         align-items: center;
@@ -354,6 +359,7 @@
               <div>게임 머니: <span id="menu-currency">0</span>원</div>
               <div>부활권: <span id="menu-tickets">0</span>개</div>
               <div>우산 보유: <span id="menu-umbrella">0</span>개</div>
+              <div id="revive-message" class="status-list__message"></div>
               <div class="status-list__controls">
                 <span>사용 우산</span>
                 <button id="umbrella-decrease" type="button" class="button--ghost">-</button>
@@ -459,6 +465,7 @@
       const menuCurrencyEl = document.getElementById("menu-currency");
       const menuTicketsEl = document.getElementById("menu-tickets");
       const menuUmbrellaEl = document.getElementById("menu-umbrella");
+      const reviveMessageEl = document.getElementById("revive-message");
       const umbrellaStatusEl = document.getElementById("umbrella-status");
       const umbrellaToUseEl = document.getElementById("umbrella-to-use");
       const umbrellaDecreaseButton = document.getElementById("umbrella-decrease");
@@ -509,6 +516,7 @@
         dragging: false,
         pendingSlowStart: false,
         pendingPreserveScore: false,
+        pendingReviveSelection: false,
       };
 
       const safeStorage = {
@@ -573,18 +581,25 @@
         menu.classList.add("menu--active");
         resultPanel.classList.remove("result--active");
         countdownEl.textContent = "";
+        if (state.pendingReviveSelection) {
+          reviveMessageEl.textContent = "부활 시 사용할 우산 개수를 선택해주세요.";
+        } else {
+          reviveMessageEl.textContent = "";
+        }
       };
 
       const showResult = () => {
         menu.classList.remove("menu--active");
         resultPanel.classList.add("result--active");
         countdownEl.textContent = "";
+        reviveMessageEl.textContent = "";
       };
 
       const showCountdown = (value) => {
         menu.classList.remove("menu--active");
         resultPanel.classList.remove("result--active");
         countdownEl.textContent = value;
+        reviveMessageEl.textContent = "";
       };
 
       const resizeCanvas = () => {
@@ -684,6 +699,7 @@
         }
         state.pendingSlowStart = options.slowStart ?? false;
         state.pendingPreserveScore = options.preserveScore ?? false;
+        state.pendingReviveSelection = false;
         overlay.classList.add("overlay--visible");
         state.countdownValue = 3;
         showCountdown(state.countdownValue);
@@ -809,7 +825,7 @@
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
-        state.difficultyTier = Math.floor(state.score / 100);
+        state.difficultyTier = Math.floor(state.score / 200);
         state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
         const slowFactor =
           Date.now() < state.slowUntil || Date.now() < state.rainResumeSlowUntil
@@ -1235,24 +1251,11 @@
 
       const useRevive = () => {
         if (state.reviveTickets < 1) return;
-        let applyUmbrella = false;
-        if (state.umbrellaInventory > 0) {
-          applyUmbrella = window.confirm("우산을 적용하고 부활할까요?");
-        }
-        if (applyUmbrella) {
-          state.umbrellaToUse = Math.min(
-            state.umbrellaToUse || state.umbrellaInventory,
-            state.umbrellaInventory,
-            settings.umbrellaMaxStack
-          );
-        } else {
-          state.umbrellaToUse = 0;
-        }
-        state.reviveTickets -= 1;
-        safeStorage.setItem(reviveKey, String(state.reviveTickets));
+        state.pendingReviveSelection = true;
+        state.umbrellaToUse = 0;
         updateCurrency();
-        overlay.classList.remove("overlay--visible");
-        startCountdown({ slowStart: true, preserveScore: true });
+        overlay.classList.add("overlay--visible");
+        showMenu();
       };
 
       window.addEventListener("resize", resizeCanvas);
@@ -1263,10 +1266,19 @@
       controlPad.addEventListener("touchstart", handleDragStart, { passive: true });
       controlPad.addEventListener("touchmove", handleDragMove, { passive: true });
       controlPad.addEventListener("touchend", handleDragEnd);
-      startButton.addEventListener("click", () => startCountdown({ slowStart: false }));
-      startButton.addEventListener("touchstart", () => startCountdown({ slowStart: false }), {
-        passive: true,
-      });
+      const handleStart = () => {
+        if (state.pendingReviveSelection) {
+          state.reviveTickets -= 1;
+          safeStorage.setItem(reviveKey, String(state.reviveTickets));
+          updateCurrency();
+          startCountdown({ slowStart: true, preserveScore: true });
+          return;
+        }
+        startCountdown({ slowStart: false });
+      };
+
+      startButton.addEventListener("click", handleStart);
+      startButton.addEventListener("touchstart", handleStart, { passive: true });
       restartButton.addEventListener("click", () => startCountdown({ slowStart: true }));
       restartButton.addEventListener("touchstart", () => startCountdown({ slowStart: true }), {
         passive: true,
