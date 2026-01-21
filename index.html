@@ -54,6 +54,10 @@
         font-weight: 600;
       }
 
+      .hud span {
+        color: #7fd3ff;
+      }
+
       .stage {
         position: relative;
         aspect-ratio: 16 / 9;
@@ -215,6 +219,35 @@
         background: rgba(98, 210, 255, 0.08);
       }
 
+      .status-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.95rem;
+        color: #cbd9f2;
+      }
+
+      .shop-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        margin-top: 12px;
+      }
+
+      .shop-item button {
+        font-size: 0.9rem;
+        padding: 8px 14px;
+      }
+
+      .shop-message {
+        margin-top: 10px;
+        color: #9fb5e0;
+        min-height: 1.2em;
+      }
+
       .modal {
         position: fixed;
         inset: 0;
@@ -297,6 +330,7 @@
       <div class="hud">
         <div>점수: <span id="score">0</span></div>
         <div>최고기록: <span id="best">0</span></div>
+        <div>코인: <span id="currency">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
       </div>
 
@@ -306,9 +340,14 @@
           <div id="menu" class="menu">
             <h2>비사이로 막가</h2>
             <p>비사이를 터치로 피하고 최대한 오래 버텨보세요.</p>
+            <div class="status-list">
+              <div>게임 머니: <span id="menu-currency">0</span>원</div>
+              <div>부활권: <span id="menu-tickets">0</span>개</div>
+            </div>
             <div class="menu__actions">
               <button id="start" type="button">게임 시작</button>
               <button id="history" type="button" class="button--ghost">기록 보기</button>
+              <button id="shop" type="button" class="button--ghost">상점</button>
               <button id="fullscreen" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
@@ -317,6 +356,7 @@
             <h2>비를 맞았어요!</h2>
             <p>다시 시작해서 비사이를 가볍게 통과해봐요.</p>
             <div class="menu__actions">
+              <button id="use-revive" type="button">부활권 사용</button>
               <button id="restart" type="button">다시 도전</button>
               <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
               <button id="fullscreen-result" type="button" class="button--ghost">전체화면</button>
@@ -345,14 +385,37 @@
       </div>
     </div>
 
+    <div id="shop-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>상점</h3>
+          <button id="close-shop" class="modal__close" type="button">닫기</button>
+        </div>
+        <div class="shop-item">
+          <div>
+            <strong>부활권</strong>
+            <div>비를 맞아도 1회 부활</div>
+          </div>
+          <button id="buy-revive" type="button">500원 구매</button>
+        </div>
+        <div id="shop-message" class="shop-message"></div>
+      </div>
+    </div>
+
     <script>
       const canvas = document.getElementById("rain-canvas");
       const ctx = canvas.getContext("2d");
       const overlay = document.getElementById("overlay");
       const startButton = document.getElementById("start");
       const restartButton = document.getElementById("restart");
+      const useReviveButton = document.getElementById("use-revive");
       const historyButton = document.getElementById("history");
       const historyFromResultButton = document.getElementById("history-from-result");
+      const shopButton = document.getElementById("shop");
+      const shopModal = document.getElementById("shop-modal");
+      const closeShopButton = document.getElementById("close-shop");
+      const buyReviveButton = document.getElementById("buy-revive");
+      const shopMessage = document.getElementById("shop-message");
       const fullscreenButton = document.getElementById("fullscreen");
       const fullscreenResultButton = document.getElementById("fullscreen-result");
       const controlPad = document.getElementById("control-pad");
@@ -364,6 +427,9 @@
       const closeHistory = document.getElementById("close-history");
       const scoreEl = document.getElementById("score");
       const bestEl = document.getElementById("best");
+      const currencyEl = document.getElementById("currency");
+      const menuCurrencyEl = document.getElementById("menu-currency");
+      const menuTicketsEl = document.getElementById("menu-tickets");
       const shieldStatusEl = document.getElementById("shield-status");
 
       const state = {
@@ -381,16 +447,20 @@
         shieldTimer: 0,
         score: 0,
         best: 0,
+        currency: 0,
+        reviveTickets: 0,
         speedMultiplier: 1,
         dropsDodged: 0,
         speedBonus: 0,
         difficultyTier: 0,
         shieldActiveUntil: 0,
         shieldCharges: 0,
+        slowUntil: 0,
         countdownTimer: null,
         countdownValue: 3,
         history: [],
         dragging: false,
+        pendingSlowStart: false,
       };
 
       const safeStorage = {
@@ -412,8 +482,12 @@
 
       const bestScoreKey = "rain-run-best";
       const historyKey = "rain-run-history";
+      const currencyKey = "rain-run-currency";
+      const reviveKey = "rain-run-revive";
       state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
       state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
+      state.currency = Number.parseInt(safeStorage.getItem(currencyKey), 10) || 0;
+      state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
 
       const settings = {
         spawnInterval: 520,
@@ -426,6 +500,9 @@
         maxExtraDrops: 3,
         shieldInterval: 9000,
         shieldRadius: 12,
+        reviveCost: 500,
+        slowDuration: 5000,
+        slowFactor: 0.6,
       };
 
       const showMenu = () => {
@@ -477,19 +554,38 @@
         bestEl.textContent = Math.floor(state.best);
       };
 
+      const updateCurrency = () => {
+        currencyEl.textContent = state.currency;
+        menuCurrencyEl.textContent = state.currency;
+        menuTicketsEl.textContent = state.reviveTickets;
+        useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
+      };
+
+      const setShopMessage = (text) => {
+        shopMessage.textContent = text;
+      };
+
+      const getShieldColor = (charges) => {
+        const palette = ["#7dffea", "#8cff7d", "#ffe36b", "#ffb86b", "#ff7db7"];
+        return palette[Math.min(charges, palette.length) - 1] || "#7dffea";
+      };
+
       const updateShieldStatus = () => {
         if (state.shieldCharges > 0) {
           const remaining = Math.max(0, Math.ceil((state.shieldActiveUntil - Date.now()) / 1000));
-          shieldStatusEl.textContent = `${remaining}s`;
+          shieldStatusEl.textContent = `${state.shieldCharges}개 · ${remaining}s`;
+          shieldStatusEl.style.color = getShieldColor(state.shieldCharges);
           return;
         }
         shieldStatusEl.textContent = "없음";
+        shieldStatusEl.style.color = "#7fd3ff";
       };
 
-      const startCountdown = () => {
+      const startCountdown = (options = {}) => {
         if (state.countdownTimer) {
           clearInterval(state.countdownTimer);
         }
+        state.pendingSlowStart = options.slowStart ?? false;
         overlay.classList.add("overlay--visible");
         state.countdownValue = 3;
         showCountdown(state.countdownValue);
@@ -509,6 +605,10 @@
       const startGame = () => {
         state.running = true;
         resetGame();
+        if (state.pendingSlowStart) {
+          state.slowUntil = Date.now() + settings.slowDuration;
+          state.pendingSlowStart = false;
+        }
         requestAnimationFrame(loop);
       };
 
@@ -516,6 +616,8 @@
         state.running = false;
         state.best = Math.max(state.best, state.score);
         safeStorage.setItem(bestScoreKey, String(state.best));
+        state.currency += Math.floor(state.score);
+        safeStorage.setItem(currencyKey, String(state.currency));
         const runRecord = {
           score: Math.floor(state.score),
           drops: state.dropsDodged,
@@ -525,6 +627,8 @@
         state.history = state.history.slice(0, 20);
         safeStorage.setItem(historyKey, JSON.stringify(state.history));
         updateScore();
+        updateCurrency();
+        useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
         overlay.classList.add("overlay--visible");
         showResult();
       };
@@ -562,9 +666,10 @@
         state.score += delta * 0.01;
         state.difficultyTier = Math.floor(state.score / 100);
         state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
-        state.speedMultiplier = 1 + state.speedBonus;
+        const slowFactor = Date.now() < state.slowUntil ? settings.slowFactor : 1;
+        state.speedMultiplier = (1 + state.speedBonus) * slowFactor;
         const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
-        const spawnInterval = settings.spawnInterval / intervalScale;
+        const spawnInterval = (settings.spawnInterval / intervalScale) / slowFactor;
 
         if (state.spawnTimer > spawnInterval) {
           state.spawnTimer -= spawnInterval;
@@ -601,6 +706,7 @@
         state.shields = state.shields.filter((shield) => shield.y < height + shield.radius);
         if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
           state.shieldCharges = 0;
+          state.shieldActiveUntil = 0;
         }
         updateShieldStatus();
       };
@@ -611,8 +717,11 @@
           const inX = shield.x > player.x && shield.x < player.x + player.width;
           const inY = shield.y > player.y - shield.radius && shield.y < player.y + player.height;
           if (inX && inY) {
-            state.shieldCharges = 1;
-            state.shieldActiveUntil = Date.now() + 30000;
+            if (state.shieldCharges < 5) {
+              state.shieldCharges += 1;
+              const baseTime = Math.max(Date.now(), state.shieldActiveUntil);
+              state.shieldActiveUntil = baseTime + 30000;
+            }
             updateShieldStatus();
             return false;
           }
@@ -659,8 +768,8 @@
       };
 
       const drawShields = () => {
-        ctx.fillStyle = "#7dffea";
         state.shields.forEach((shield) => {
+          ctx.fillStyle = "#7dffea";
           ctx.beginPath();
           ctx.arc(shield.x, shield.y, shield.radius, 0, Math.PI * 2);
           ctx.fill();
@@ -677,7 +786,7 @@
         ctx.fillStyle = "#2c3050";
         ctx.fillRect(player.x + player.width * 0.4, player.y - 14, 8, 14);
         if (state.shieldCharges > 0) {
-          ctx.strokeStyle = "#7dffea";
+          ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 3;
           ctx.strokeRect(player.x - 6, player.y - 6, player.width + 12, player.height + 12);
         }
@@ -764,6 +873,39 @@
         historyModal.setAttribute("aria-hidden", "true");
       };
 
+      const openShop = () => {
+        setShopMessage("");
+        shopModal.classList.add("modal--open");
+        shopModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeShop = () => {
+        shopModal.classList.remove("modal--open");
+        shopModal.setAttribute("aria-hidden", "true");
+      };
+
+      const buyRevive = () => {
+        if (state.currency < settings.reviveCost) {
+          setShopMessage("게임 머니가 부족합니다.");
+          return;
+        }
+        state.currency -= settings.reviveCost;
+        state.reviveTickets += 1;
+        safeStorage.setItem(currencyKey, String(state.currency));
+        safeStorage.setItem(reviveKey, String(state.reviveTickets));
+        updateCurrency();
+        setShopMessage("부활권을 구매했어요!");
+      };
+
+      const useRevive = () => {
+        if (state.reviveTickets < 1) return;
+        state.reviveTickets -= 1;
+        safeStorage.setItem(reviveKey, String(state.reviveTickets));
+        updateCurrency();
+        overlay.classList.remove("overlay--visible");
+        startCountdown({ slowStart: true });
+      };
+
       window.addEventListener("resize", resizeCanvas);
 
       controlPad.addEventListener("mousedown", handleDragStart);
@@ -772,12 +914,25 @@
       controlPad.addEventListener("touchstart", handleDragStart, { passive: true });
       controlPad.addEventListener("touchmove", handleDragMove, { passive: true });
       controlPad.addEventListener("touchend", handleDragEnd);
-      startButton.addEventListener("click", startCountdown);
-      startButton.addEventListener("touchstart", startCountdown, { passive: true });
-      restartButton.addEventListener("click", startCountdown);
-      restartButton.addEventListener("touchstart", startCountdown, { passive: true });
+      startButton.addEventListener("click", () => startCountdown({ slowStart: false }));
+      startButton.addEventListener("touchstart", () => startCountdown({ slowStart: false }), {
+        passive: true,
+      });
+      restartButton.addEventListener("click", () => startCountdown({ slowStart: true }));
+      restartButton.addEventListener("touchstart", () => startCountdown({ slowStart: true }), {
+        passive: true,
+      });
+      useReviveButton.addEventListener("click", useRevive);
       historyButton.addEventListener("click", openHistory);
       historyFromResultButton.addEventListener("click", openHistory);
+      shopButton.addEventListener("click", openShop);
+      buyReviveButton.addEventListener("click", buyRevive);
+      closeShopButton.addEventListener("click", closeShop);
+      shopModal.addEventListener("click", (event) => {
+        if (event.target === shopModal) {
+          closeShop();
+        }
+      });
       fullscreenButton.addEventListener("click", toggleFullscreen);
       fullscreenResultButton.addEventListener("click", toggleFullscreen);
       closeHistory.addEventListener("click", closeHistoryModal);
@@ -789,6 +944,8 @@
 
       resizeCanvas();
       updateScore();
+      updateCurrency();
+      updateShieldStatus();
       showMenu();
     </script>
   </body>
