@@ -641,6 +641,11 @@
         useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
         menuUmbrellaEl.textContent = state.umbrellaInventory;
         umbrellaStatusEl.textContent = state.umbrellaActive;
+        if (state.umbrellaActive > 0) {
+          umbrellaStatusEl.style.color = getShieldColor(state.umbrellaActive);
+        } else {
+          umbrellaStatusEl.style.color = "#7fd3ff";
+        }
         umbrellaToUseEl.textContent = state.umbrellaToUse;
       };
 
@@ -805,7 +810,10 @@
         state.score += delta * 0.01;
         state.difficultyTier = Math.floor(state.score / 100);
         state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
-        const slowFactor = Date.now() < state.slowUntil ? settings.slowFactor : 1;
+        const slowFactor =
+          Date.now() < state.slowUntil || Date.now() < state.rainResumeSlowUntil
+            ? settings.slowFactor
+            : 1;
         const cloudSlowFactor =
           Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
         const totalSlowFactor = slowFactor * cloudSlowFactor;
@@ -1077,7 +1085,7 @@
           ctx.strokeRect(player.x - 6, player.y - 6, size.width + 12, size.height + 12);
         }
         if (state.umbrellaActive > 0) {
-          ctx.strokeStyle = "#7bb7ff";
+          ctx.strokeStyle = getShieldColor(state.umbrellaActive);
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(player.x + size.width / 2, player.y - 12, 18, Math.PI, 0);
