@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>비사이로 막가</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="game">
+      <header class="game__header">
+        <h1>비사이로 막가</h1>
+        <p>어릴 적 장난스러운 말처럼, 비 사이를 터치로 피해보세요.</p>
+      </header>
+
+      <div class="hud">
+        <div>점수: <span id="score">0</span></div>
+        <div>최고기록: <span id="best">0</span></div>
+      </div>
+
+      <div class="stage">
+        <canvas id="rain-canvas" aria-label="비사이로 막가 게임 화면"></canvas>
+        <div id="overlay" class="overlay overlay--visible">
+          <h2>터치로 이동!</h2>
+          <p>비사이를 빠르게 피해서 최대한 오래 버텨보세요.</p>
+          <button id="start">시작하기</button>
+        </div>
+      </div>
+
+      <footer class="game__footer">
+        <p>팁: 화면 어디를 터치해도 캐릭터가 따라갑니다.</p>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
