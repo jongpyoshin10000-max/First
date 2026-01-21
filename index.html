@@ -227,6 +227,13 @@
         color: #cbd9f2;
       }
 
+      .status-list__controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
       .shop-item {
         display: flex;
         align-items: center;
@@ -235,6 +242,7 @@
         border-radius: 12px;
         background: rgba(255, 255, 255, 0.04);
         margin-top: 12px;
+        gap: 12px;
       }
 
       .shop-item button {
@@ -332,6 +340,7 @@
         <div>최고기록: <span id="best">0</span></div>
         <div>코인: <span id="currency">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
+        <div>우산: <span id="umbrella-status">0</span></div>
       </div>
 
       <div class="stage">
@@ -343,6 +352,13 @@
             <div class="status-list">
               <div>게임 머니: <span id="menu-currency">0</span>원</div>
               <div>부활권: <span id="menu-tickets">0</span>개</div>
+              <div>우산 보유: <span id="menu-umbrella">0</span>개</div>
+              <div class="status-list__controls">
+                <span>사용 우산</span>
+                <button id="umbrella-decrease" type="button" class="button--ghost">-</button>
+                <span id="umbrella-to-use">0</span>
+                <button id="umbrella-increase" type="button" class="button--ghost">+</button>
+              </div>
             </div>
             <div class="menu__actions">
               <button id="start" type="button">게임 시작</button>
@@ -399,6 +415,13 @@
           </div>
           <button id="buy-revive" type="button">500원 구매</button>
         </div>
+        <div class="shop-item">
+          <div>
+            <strong>우산</strong>
+            <div>보호막과 같은 효과 (제한시간 없음)</div>
+          </div>
+          <button id="buy-umbrella" type="button">300원 구매</button>
+        </div>
         <div id="shop-message" class="shop-message"></div>
       </div>
     </div>
@@ -417,6 +440,7 @@
       const shopModal = document.getElementById("shop-modal");
       const closeShopButton = document.getElementById("close-shop");
       const buyReviveButton = document.getElementById("buy-revive");
+      const buyUmbrellaButton = document.getElementById("buy-umbrella");
       const shopMessage = document.getElementById("shop-message");
       const fullscreenButton = document.getElementById("fullscreen");
       const fullscreenResultButton = document.getElementById("fullscreen-result");
@@ -432,6 +456,11 @@
       const currencyEl = document.getElementById("currency");
       const menuCurrencyEl = document.getElementById("menu-currency");
       const menuTicketsEl = document.getElementById("menu-tickets");
+      const menuUmbrellaEl = document.getElementById("menu-umbrella");
+      const umbrellaStatusEl = document.getElementById("umbrella-status");
+      const umbrellaToUseEl = document.getElementById("umbrella-to-use");
+      const umbrellaDecreaseButton = document.getElementById("umbrella-decrease");
+      const umbrellaIncreaseButton = document.getElementById("umbrella-increase");
       const shieldStatusEl = document.getElementById("shield-status");
 
       const state = {
@@ -439,6 +468,8 @@
         drops: [],
         shields: [],
         coins: [],
+        clouds: [],
+        bolts: [],
         player: {
           x: 0,
           y: 0,
@@ -449,22 +480,32 @@
         spawnTimer: 0,
         shieldTimer: 0,
         coinTimer: 0,
+        cloudTimer: 0,
+        boltTimer: 0,
         score: 0,
         best: 0,
         currency: 0,
         reviveTickets: 0,
+        umbrellaInventory: 0,
+        umbrellaActive: 0,
+        umbrellaToUse: 0,
         speedMultiplier: 1,
         dropsDodged: 0,
         speedBonus: 0,
         difficultyTier: 0,
         shieldActiveUntil: 0,
         shieldCharges: 0,
+        sizeMultiplier: 1,
+        sizeEffectUntil: 0,
         slowUntil: 0,
+        rainPauseUntil: 0,
+        runAwardedScore: 0,
         countdownTimer: null,
         countdownValue: 3,
         history: [],
         dragging: false,
         pendingSlowStart: false,
+        pendingPreserveScore: false,
       };
 
       const safeStorage = {
@@ -488,10 +529,12 @@
       const historyKey = "rain-run-history";
       const currencyKey = "rain-run-currency";
       const reviveKey = "rain-run-revive";
+      const umbrellaKey = "rain-run-umbrella";
       state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
       state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
       state.currency = Number.parseInt(safeStorage.getItem(currencyKey), 10) || 0;
       state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
+      state.umbrellaInventory = Number.parseInt(safeStorage.getItem(umbrellaKey), 10) || 0;
 
       const settings = {
         spawnInterval: 520,
@@ -507,7 +550,14 @@
         coinInterval: 7000,
         coinRadius: 12,
         coinValues: [100, 200, 300, 500],
+        cloudInterval: 12000,
+        boltInterval: 11000,
+        cloudRadius: 20,
+        boltRadius: 12,
+        boltDuration: 60000,
         reviveCost: 500,
+        umbrellaCost: 300,
+        umbrellaMaxStack: 5,
         slowDuration: 5000,
         slowFactor: 0.6,
       };
@@ -540,20 +590,31 @@
         state.player.x = width / 2 - state.player.width / 2;
       };
 
-      const resetGame = () => {
+      const resetGame = (options = {}) => {
+        const preserveScore = options.preserveScore ?? false;
         state.drops = [];
-        state.score = 0;
+        if (!preserveScore) {
+          state.score = 0;
+          state.runAwardedScore = 0;
+        }
         state.speedMultiplier = 1;
         state.spawnTimer = 0;
         state.shieldTimer = 0;
         state.coinTimer = 0;
+        state.cloudTimer = 0;
+        state.boltTimer = 0;
         state.dropsDodged = 0;
         state.speedBonus = 0;
         state.difficultyTier = 0;
         state.shields = [];
         state.coins = [];
+        state.clouds = [];
+        state.bolts = [];
         state.shieldActiveUntil = 0;
         state.shieldCharges = 0;
+        state.sizeMultiplier = 1;
+        state.sizeEffectUntil = 0;
+        state.rainPauseUntil = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -568,6 +629,9 @@
         menuCurrencyEl.textContent = state.currency;
         menuTicketsEl.textContent = state.reviveTickets;
         useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
+        menuUmbrellaEl.textContent = state.umbrellaInventory;
+        umbrellaStatusEl.textContent = state.umbrellaActive;
+        umbrellaToUseEl.textContent = state.umbrellaToUse;
       };
 
       const setShopMessage = (text) => {
@@ -595,6 +659,7 @@
           clearInterval(state.countdownTimer);
         }
         state.pendingSlowStart = options.slowStart ?? false;
+        state.pendingPreserveScore = options.preserveScore ?? false;
         overlay.classList.add("overlay--visible");
         state.countdownValue = 3;
         showCountdown(state.countdownValue);
@@ -613,11 +678,20 @@
 
       const startGame = () => {
         state.running = true;
-        resetGame();
+        resetGame({ preserveScore: state.pendingPreserveScore });
+        if (!state.pendingPreserveScore) {
+          const usableUmbrellas = Math.min(state.umbrellaToUse, state.umbrellaInventory);
+          state.umbrellaInventory -= usableUmbrellas;
+          state.umbrellaActive = usableUmbrellas;
+          state.umbrellaToUse = 0;
+          safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
+          updateCurrency();
+        }
         if (state.pendingSlowStart) {
           state.slowUntil = Date.now() + settings.slowDuration;
           state.pendingSlowStart = false;
         }
+        state.pendingPreserveScore = false;
         requestAnimationFrame(loop);
       };
 
@@ -625,7 +699,9 @@
         state.running = false;
         state.best = Math.max(state.best, state.score);
         safeStorage.setItem(bestScoreKey, String(state.best));
-        state.currency += Math.floor(state.score);
+        const newAward = Math.max(0, Math.floor(state.score) - state.runAwardedScore);
+        state.currency += newAward;
+        state.runAwardedScore = Math.floor(state.score);
         safeStorage.setItem(currencyKey, String(state.currency));
         const runRecord = {
           score: Math.floor(state.score),
@@ -684,6 +760,30 @@
         });
       };
 
+      const spawnCloud = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.cloudRadius;
+        state.clouds.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 140 + Math.random() * 60,
+        });
+      };
+
+      const spawnBolt = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.boltRadius;
+        const type = Math.random() > 0.5 ? "yellow" : "green";
+        state.bolts.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 220 + Math.random() * 80,
+          type,
+        });
+      };
+
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
@@ -694,7 +794,8 @@
         const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
         const spawnInterval = (settings.spawnInterval / intervalScale) / slowFactor;
 
-        if (state.spawnTimer > spawnInterval) {
+        const isRainPaused = Date.now() < state.rainPauseUntil;
+        if (!isRainPaused && state.spawnTimer > spawnInterval) {
           state.spawnTimer -= spawnInterval;
           spawnDrop();
           const extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
@@ -715,9 +816,23 @@
           spawnCoin();
         }
 
-        state.drops.forEach((drop) => {
-          drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
-        });
+        state.cloudTimer += delta;
+        if (state.cloudTimer > settings.cloudInterval) {
+          state.cloudTimer -= settings.cloudInterval;
+          spawnCloud();
+        }
+
+        state.boltTimer += delta;
+        if (state.boltTimer > settings.boltInterval) {
+          state.boltTimer -= settings.boltInterval;
+          spawnBolt();
+        }
+
+        if (!isRainPaused) {
+          state.drops.forEach((drop) => {
+            drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
+          });
+        }
 
         state.shields.forEach((shield) => {
           shield.y += (shield.speed * delta) / 1000;
@@ -725,6 +840,14 @@
 
         state.coins.forEach((coin) => {
           coin.y += (coin.speed * delta) / 1000;
+        });
+
+        state.clouds.forEach((cloud) => {
+          cloud.y += (cloud.speed * delta) / 1000;
+        });
+
+        state.bolts.forEach((bolt) => {
+          bolt.y += (bolt.speed * delta) / 1000;
         });
 
         const { height } = canvas.getBoundingClientRect();
@@ -738,18 +861,30 @@
 
         state.shields = state.shields.filter((shield) => shield.y < height + shield.radius);
         state.coins = state.coins.filter((coin) => coin.y < height + coin.radius);
+        state.clouds = state.clouds.filter((cloud) => cloud.y < height + cloud.radius);
+        state.bolts = state.bolts.filter((bolt) => bolt.y < height + bolt.radius);
         if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
           state.shieldCharges = 0;
           state.shieldActiveUntil = 0;
         }
+        if (state.sizeMultiplier !== 1 && Date.now() > state.sizeEffectUntil) {
+          state.sizeMultiplier = 1;
+          state.sizeEffectUntil = 0;
+        }
         updateShieldStatus();
       };
 
+      const getPlayerSize = () => ({
+        width: state.player.width * state.sizeMultiplier,
+        height: state.player.height * state.sizeMultiplier,
+      });
+
       const checkCollision = () => {
         const { player } = state;
+        const size = getPlayerSize();
         state.shields = state.shields.filter((shield) => {
-          const inX = shield.x > player.x && shield.x < player.x + player.width;
-          const inY = shield.y > player.y - shield.radius && shield.y < player.y + player.height;
+          const inX = shield.x > player.x && shield.x < player.x + size.width;
+          const inY = shield.y > player.y - shield.radius && shield.y < player.y + size.height;
           if (inX && inY) {
             if (state.shieldCharges < 5) {
               state.shieldCharges += 1;
@@ -763,8 +898,8 @@
         });
 
         state.coins = state.coins.filter((coin) => {
-          const inX = coin.x > player.x && coin.x < player.x + player.width;
-          const inY = coin.y > player.y - coin.radius && coin.y < player.y + player.height;
+          const inX = coin.x > player.x && coin.x < player.x + size.width;
+          const inY = coin.y > player.y - coin.radius && coin.y < player.y + size.height;
           if (inX && inY) {
             state.currency += coin.value;
             safeStorage.setItem(currencyKey, String(state.currency));
@@ -774,11 +909,36 @@
           return true;
         });
 
+        state.clouds = state.clouds.filter((cloud) => {
+          const inX = cloud.x > player.x && cloud.x < player.x + size.width;
+          const inY = cloud.y > player.y - cloud.radius && cloud.y < player.y + size.height;
+          if (inX && inY) {
+            state.rainPauseUntil = Date.now() + 5000;
+            return false;
+          }
+          return true;
+        });
+
+        state.bolts = state.bolts.filter((bolt) => {
+          const inX = bolt.x > player.x && bolt.x < player.x + size.width;
+          const inY = bolt.y > player.y - bolt.radius && bolt.y < player.y + size.height;
+          if (inX && inY) {
+            if (bolt.type === "yellow") {
+              state.sizeMultiplier = 0.5;
+            } else {
+              state.sizeMultiplier = 1.5;
+            }
+            state.sizeEffectUntil = Date.now() + settings.boltDuration;
+            return false;
+          }
+          return true;
+        });
+
         return state.drops.some((drop) => {
           const dropBottom = drop.y + drop.height;
-          const playerBottom = player.y + player.height;
+          const playerBottom = player.y + size.height;
           const isHit =
-            drop.x < player.x + player.width &&
+            drop.x < player.x + size.width &&
             drop.x + drop.width > player.x &&
             dropBottom > player.y &&
             drop.y < playerBottom;
@@ -786,9 +946,17 @@
             return false;
           }
           if (state.shieldCharges > 0) {
-            state.shieldCharges = 0;
-            state.shieldActiveUntil = 0;
+            state.shieldCharges -= 1;
+            if (state.shieldCharges === 0) {
+              state.shieldActiveUntil = 0;
+            }
             updateShieldStatus();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
+          if (state.umbrellaActive > 0) {
+            state.umbrellaActive -= 1;
+            updateCurrency();
             drop.y = canvas.getBoundingClientRect().height + drop.height;
             return false;
           }
@@ -842,16 +1010,45 @@
         });
       };
 
+      const drawClouds = () => {
+        state.clouds.forEach((cloud) => {
+          ctx.fillStyle = "#c8d8f2";
+          ctx.beginPath();
+          ctx.arc(cloud.x - 12, cloud.y, cloud.radius * 0.7, 0, Math.PI * 2);
+          ctx.arc(cloud.x + 2, cloud.y - 6, cloud.radius * 0.9, 0, Math.PI * 2);
+          ctx.arc(cloud.x + 16, cloud.y + 2, cloud.radius * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      };
+
+      const drawBolts = () => {
+        state.bolts.forEach((bolt) => {
+          const color = bolt.type === "yellow" ? "#ffd400" : "#55ff7a";
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(bolt.x, bolt.y, bolt.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#1f1f1f";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(bolt.x - 4, bolt.y - 6);
+          ctx.lineTo(bolt.x + 2, bolt.y);
+          ctx.lineTo(bolt.x - 2, bolt.y + 6);
+          ctx.stroke();
+        });
+      };
+
       const drawPlayer = () => {
         const { player } = state;
+        const size = getPlayerSize();
         ctx.fillStyle = "#ffe96b";
-        ctx.fillRect(player.x, player.y, player.width, player.height);
+        ctx.fillRect(player.x, player.y, size.width, size.height);
         ctx.fillStyle = "#2c3050";
-        ctx.fillRect(player.x + player.width * 0.4, player.y - 14, 8, 14);
+        ctx.fillRect(player.x + size.width * 0.4, player.y - 14, 8, 14);
         if (state.shieldCharges > 0) {
           ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 3;
-          ctx.strokeRect(player.x - 6, player.y - 6, player.width + 12, player.height + 12);
+          ctx.strokeRect(player.x - 6, player.y - 6, size.width + 12, size.height + 12);
         }
       };
 
@@ -865,6 +1062,8 @@
         drawDrops();
         drawShields();
         drawCoins();
+        drawClouds();
+        drawBolts();
         drawPlayer();
         updateScore();
 
@@ -878,11 +1077,12 @@
 
       const movePlayerFromX = (clientX) => {
         const { width } = canvas.getBoundingClientRect();
+        const size = getPlayerSize();
         const rect = canvas.getBoundingClientRect();
         const x = clientX - rect.left;
         state.player.x = Math.max(
           0,
-          Math.min(width - state.player.width, x - state.player.width / 2)
+          Math.min(width - size.width, x - size.width / 2)
         );
       };
 
@@ -961,13 +1161,39 @@
         setShopMessage("부활권을 구매했어요!");
       };
 
+      const buyUmbrella = () => {
+        if (state.currency < settings.umbrellaCost) {
+          setShopMessage("게임 머니가 부족합니다.");
+          return;
+        }
+        if (state.umbrellaInventory >= settings.umbrellaMaxStack) {
+          setShopMessage("우산은 최대 5개까지 보유할 수 있어요.");
+          return;
+        }
+        state.currency -= settings.umbrellaCost;
+        state.umbrellaInventory += 1;
+        safeStorage.setItem(currencyKey, String(state.currency));
+        safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
+        updateCurrency();
+        setShopMessage("우산을 구매했어요!");
+      };
+
+      const adjustUmbrellaToUse = (delta) => {
+        const next = Math.max(
+          0,
+          Math.min(state.umbrellaInventory, state.umbrellaToUse + delta)
+        );
+        state.umbrellaToUse = next;
+        updateCurrency();
+      };
+
       const useRevive = () => {
         if (state.reviveTickets < 1) return;
         state.reviveTickets -= 1;
         safeStorage.setItem(reviveKey, String(state.reviveTickets));
         updateCurrency();
         overlay.classList.remove("overlay--visible");
-        startCountdown({ slowStart: true });
+        startCountdown({ slowStart: true, preserveScore: true });
       };
 
       window.addEventListener("resize", resizeCanvas);
@@ -987,11 +1213,14 @@
         passive: true,
       });
       useReviveButton.addEventListener("click", useRevive);
+      umbrellaDecreaseButton.addEventListener("click", () => adjustUmbrellaToUse(-1));
+      umbrellaIncreaseButton.addEventListener("click", () => adjustUmbrellaToUse(1));
       historyButton.addEventListener("click", openHistory);
       historyFromResultButton.addEventListener("click", openHistory);
       shopButton.addEventListener("click", openShop);
       shopFromResultButton.addEventListener("click", openShop);
       buyReviveButton.addEventListener("click", buyRevive);
+      buyUmbrellaButton.addEventListener("click", buyUmbrella);
       closeShopButton.addEventListener("click", closeShop);
       shopModal.addEventListener("click", (event) => {
         if (event.target === shopModal) {
