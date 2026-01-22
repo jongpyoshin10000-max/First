@@ -261,6 +261,59 @@
         font-size: 0.85rem;
       }
 
+      .profile-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .profile-fields label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: #cfe1ff;
+        font-size: 0.95rem;
+      }
+
+      .profile-fields input {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(9, 14, 28, 0.8);
+        color: #e8f2ff;
+        font-size: 1rem;
+      }
+
+      .character-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+      }
+
+      .character-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid transparent;
+        color: #e8f2ff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .character-button span {
+        font-size: 1.4rem;
+      }
+
+      .character-button--active {
+        border-color: #62d2ff;
+        box-shadow: 0 0 0 1px rgba(98, 210, 255, 0.4);
+      }
+
       .shop-item {
         display: flex;
         align-items: center;
@@ -379,6 +432,8 @@
           <div>레벨: <span id="level">1</span></div>
           <div>비의 양: <span id="rain-amount">1</span></div>
           <div>비의 속도: <span id="rain-speed">1.00</span></div>
+          <div>닉네임: <span id="player-name">게스트</span></div>
+          <div>캐릭터: <span id="player-character">학생</span></div>
         </div>
       </header>
 
@@ -389,6 +444,7 @@
         <div>부활권: <span id="revive-status">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
         <div>우산: <span id="umbrella-status">0</span></div>
+        <button id="wipe" type="button" class="button--ghost">필사기</button>
       </div>
 
       <div class="stage">
@@ -414,6 +470,7 @@
               <button id="history" type="button" class="button--ghost">기록 보기</button>
               <button id="shop" type="button" class="button--ghost">상점</button>
               <button id="guide" type="button" class="button--ghost">게임설명</button>
+              <button id="profile" type="button" class="button--ghost">프로필 설정</button>
               <button id="fullscreen" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
@@ -497,6 +554,25 @@
       </div>
     </div>
 
+    <div id="profile-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>프로필 설정</h3>
+          <button id="close-profile" class="modal__close" type="button">닫기</button>
+        </div>
+        <div class="profile-fields">
+          <label>
+            닉네임
+            <input id="profile-name" type="text" maxlength="12" placeholder="이름을 입력하세요" />
+          </label>
+          <div>
+            <div class="control__label">캐릭터 선택</div>
+            <div id="character-options" class="character-options"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
       const canvas = document.getElementById("rain-canvas");
       const ctx = canvas.getContext("2d");
@@ -510,8 +586,13 @@
       const shopFromResultButton = document.getElementById("shop-from-result");
       const shopButton = document.getElementById("shop");
       const guideButton = document.getElementById("guide");
+      const profileButton = document.getElementById("profile");
       const guideModal = document.getElementById("guide-modal");
       const closeGuideButton = document.getElementById("close-guide");
+      const profileModal = document.getElementById("profile-modal");
+      const closeProfileButton = document.getElementById("close-profile");
+      const profileNameInput = document.getElementById("profile-name");
+      const characterOptions = document.getElementById("character-options");
       const shopModal = document.getElementById("shop-modal");
       const closeShopButton = document.getElementById("close-shop");
       const buyReviveButton = document.getElementById("buy-revive");
@@ -542,6 +623,9 @@
       const rainAmountEl = document.getElementById("rain-amount");
       const rainSpeedEl = document.getElementById("rain-speed");
       const shieldStatusEl = document.getElementById("shield-status");
+      const playerNameEl = document.getElementById("player-name");
+      const playerCharacterEl = document.getElementById("player-character");
+      const wipeButton = document.getElementById("wipe");
 
       const state = {
         running: false,
@@ -577,6 +661,9 @@
         difficultyTier: 0,
         sunSpeedTierOverride: null,
         sunSpeedOverrideUntil: 0,
+        wipeActiveUntil: 0,
+        profileName: "게스트",
+        selectedCharacterId: "student",
         shieldActiveUntil: 0,
         shieldCharges: 0,
         sizeMultiplier: 1,
@@ -617,12 +704,16 @@
       const currencyKey = "rain-run-currency";
       const reviveKey = "rain-run-revive";
       const umbrellaKey = "rain-run-umbrella";
+      const profileNameKey = "rain-run-profile-name";
+      const profileCharacterKey = "rain-run-profile-character";
       state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
       state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
       const storedCurrency = safeStorage.getItem(currencyKey);
       state.currency = storedCurrency === null ? 2000 : Number.parseInt(storedCurrency, 10) || 0;
       state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
       state.umbrellaInventory = Number.parseInt(safeStorage.getItem(umbrellaKey), 10) || 0;
+      state.profileName = safeStorage.getItem(profileNameKey) || "게스트";
+      state.selectedCharacterId = safeStorage.getItem(profileCharacterKey) || "student";
 
       const settings = {
         spawnInterval: 520,
@@ -654,7 +745,15 @@
         slowDuration: 5000,
         slowFactor: 0.6,
         pickupPaddingX: 8,
+        wipeDuration: 3000,
       };
+
+      const characters = [
+        { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
+        { id: "teacher", name: "선생님", icon: "🧑‍🏫", wipeEmoji: "📚" },
+        { id: "student", name: "학생", icon: "🧑‍🎓", wipeEmoji: "🍬" },
+        { id: "general", name: "장군", icon: "🪖", wipeEmoji: "⚔️" },
+      ];
 
       const showMenu = () => {
         menu.classList.add("menu--active");
@@ -723,6 +822,7 @@
         state.rainResumeSlowUntil = 0;
         state.sunSpeedTierOverride = null;
         state.sunSpeedOverrideUntil = 0;
+        state.wipeActiveUntil = 0;
         if (!preserveScore) {
           state.revivesUsed = 0;
         }
@@ -754,6 +854,40 @@
 
       const setShopMessage = (text) => {
         shopMessage.textContent = text;
+      };
+
+      const getSelectedCharacter = () =>
+        characters.find((character) => character.id === state.selectedCharacterId) ||
+        characters[2];
+
+      const renderCharacterOptions = () => {
+        characterOptions.innerHTML = "";
+        characters.forEach((character) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "character-button";
+          button.dataset.characterId = character.id;
+          button.innerHTML = `<span>${character.icon}</span>${character.name}`;
+          button.addEventListener("click", () => {
+            state.selectedCharacterId = character.id;
+            safeStorage.setItem(profileCharacterKey, character.id);
+            updateProfileUI();
+          });
+          characterOptions.appendChild(button);
+        });
+      };
+
+      const updateProfileUI = () => {
+        playerNameEl.textContent = state.profileName || "게스트";
+        const selected = getSelectedCharacter();
+        playerCharacterEl.textContent = selected.name;
+        profileNameInput.value = state.profileName;
+        characterOptions.querySelectorAll(".character-button").forEach((button) => {
+          button.classList.toggle(
+            "character-button--active",
+            button.dataset.characterId === state.selectedCharacterId
+          );
+        });
       };
 
       const getShieldColor = (charges) => {
@@ -1186,7 +1320,20 @@
       const drawDrops = () => {
         ctx.fillStyle = "#5fc9ff";
         state.drops.forEach((drop) => {
-          ctx.fillRect(drop.x, drop.y, drop.width, drop.height);
+          const centerX = drop.x + drop.width / 2;
+          const topY = drop.y;
+          const bottomY = drop.y + drop.height;
+          ctx.beginPath();
+          ctx.moveTo(centerX, topY);
+          ctx.quadraticCurveTo(drop.x, topY + drop.height * 0.4, centerX, bottomY);
+          ctx.quadraticCurveTo(
+            drop.x + drop.width,
+            topY + drop.height * 0.4,
+            centerX,
+            topY
+          );
+          ctx.closePath();
+          ctx.fill();
         });
       };
 
@@ -1293,10 +1440,15 @@
       const drawPlayer = () => {
         const { player } = state;
         const size = getPlayerSize();
-        ctx.fillStyle = "#ffe96b";
-        ctx.fillRect(player.x, player.y, size.width, size.height);
-        ctx.fillStyle = "#2c3050";
-        ctx.fillRect(player.x + size.width * 0.4, player.y - 14, 8, 14);
+        const character = getSelectedCharacter();
+        ctx.font = `${size.width * 1.4}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          character.icon,
+          player.x + size.width / 2,
+          player.y + size.height / 2
+        );
         if (state.shieldCharges > 0) {
           ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 3;
@@ -1312,6 +1464,20 @@
           ctx.moveTo(player.x + size.width / 2, player.y - 12);
           ctx.lineTo(player.x + size.width / 2, player.y + 6);
           ctx.stroke();
+        }
+        if (Date.now() < state.wipeActiveUntil) {
+          const wipeEmoji = character.wipeEmoji;
+          const burstCount = 6;
+          ctx.font = `${size.width}px sans-serif`;
+          for (let i = 0; i < burstCount; i += 1) {
+            const angle = (Math.PI * 2 * i) / burstCount;
+            const radius = size.width * 1.6;
+            ctx.fillText(
+              wipeEmoji,
+              player.x + size.width / 2 + Math.cos(angle) * radius,
+              player.y + size.height / 2 + Math.sin(angle) * radius
+            );
+          }
         }
       };
 
@@ -1423,6 +1589,16 @@
         guideModal.setAttribute("aria-hidden", "true");
       };
 
+      const openProfile = () => {
+        profileModal.classList.add("modal--open");
+        profileModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeProfile = () => {
+        profileModal.classList.remove("modal--open");
+        profileModal.setAttribute("aria-hidden", "true");
+      };
+
       const closeOpenModal = () => {
         if (historyModal.classList.contains("modal--open")) {
           closeHistoryModal();
@@ -1432,6 +1608,9 @@
         }
         if (guideModal.classList.contains("modal--open")) {
           closeGuide();
+        }
+        if (profileModal.classList.contains("modal--open")) {
+          closeProfile();
         }
       };
 
@@ -1472,6 +1651,14 @@
         );
         state.umbrellaToUse = next;
         updateCurrency();
+      };
+
+      const useWipe = () => {
+        if (!state.running) return;
+        const until = Date.now() + settings.wipeDuration;
+        state.drops = [];
+        state.rainPauseUntil = Math.max(state.rainPauseUntil, until);
+        state.wipeActiveUntil = Math.max(state.wipeActiveUntil, until);
       };
 
       const useRevive = () => {
@@ -1518,15 +1705,23 @@
       backToMenuButton.addEventListener("click", handleBackToMenu);
       umbrellaDecreaseButton.addEventListener("click", () => adjustUmbrellaToUse(-1));
       umbrellaIncreaseButton.addEventListener("click", () => adjustUmbrellaToUse(1));
+      wipeButton.addEventListener("click", useWipe);
       historyButton.addEventListener("click", openHistory);
       historyFromResultButton.addEventListener("click", openHistory);
       shopButton.addEventListener("click", openShop);
       shopFromResultButton.addEventListener("click", openShop);
       guideButton.addEventListener("click", openGuide);
+      profileButton.addEventListener("click", openProfile);
       buyReviveButton.addEventListener("click", buyRevive);
       buyUmbrellaButton.addEventListener("click", buyUmbrella);
       closeShopButton.addEventListener("click", closeShop);
       closeGuideButton.addEventListener("click", closeGuide);
+      closeProfileButton.addEventListener("click", closeProfile);
+      profileNameInput.addEventListener("input", (event) => {
+        state.profileName = event.target.value.trim() || "게스트";
+        safeStorage.setItem(profileNameKey, state.profileName);
+        updateProfileUI();
+      });
       shopModal.addEventListener("click", (event) => {
         if (event.target === shopModal) {
           closeShop();
@@ -1535,6 +1730,11 @@
       guideModal.addEventListener("click", (event) => {
         if (event.target === guideModal) {
           closeGuide();
+        }
+      });
+      profileModal.addEventListener("click", (event) => {
+        if (event.target === profileModal) {
+          closeProfile();
         }
       });
       fullscreenButton.addEventListener("click", toggleFullscreen);
@@ -1551,6 +1751,8 @@
         }
       });
 
+      renderCharacterOptions();
+      updateProfileUI();
       resizeCanvas();
       updateScore();
       updateCurrency();
