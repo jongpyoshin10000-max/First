@@ -582,8 +582,7 @@
         slowUntil: 0,
         rainPauseUntil: 0,
         rainResumeSlowUntil: 0,
-        sunOverrideUntil: 0,
-        sunTierOverride: 0,
+        sunSpeedOffset: 0,
         revivesUsed: 0,
         runAwardedScore: 0,
         countdownTimer: null,
@@ -721,8 +720,7 @@
         state.sizeEffectUntil = 0;
         state.rainPauseUntil = 0;
         state.rainResumeSlowUntil = 0;
-        state.sunOverrideUntil = 0;
-        state.sunTierOverride = 0;
+        state.sunSpeedOffset = 0;
         if (!preserveScore) {
           state.revivesUsed = 0;
         }
@@ -1398,6 +1396,18 @@
         guideModal.setAttribute("aria-hidden", "true");
       };
 
+      const closeOpenModal = () => {
+        if (historyModal.classList.contains("modal--open")) {
+          closeHistoryModal();
+        }
+        if (shopModal.classList.contains("modal--open")) {
+          closeShop();
+        }
+        if (guideModal.classList.contains("modal--open")) {
+          closeGuide();
+        }
+      };
+
       const buyRevive = () => {
         if (state.currency < settings.reviveCost) {
           setShopMessage("게임 머니가 부족합니다.");
@@ -1503,6 +1513,11 @@
       fullscreenButton.addEventListener("click", toggleFullscreen);
       fullscreenResultButton.addEventListener("click", toggleFullscreen);
       closeHistory.addEventListener("click", closeHistoryModal);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeOpenModal();
+        }
+      });
       historyModal.addEventListener("click", (event) => {
         if (event.target === historyModal) {
           closeHistoryModal();
