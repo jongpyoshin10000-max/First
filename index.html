@@ -1199,6 +1199,11 @@
           ctx.strokeStyle = "#2bffe0";
           ctx.lineWidth = 2;
           ctx.stroke();
+          ctx.fillStyle = "#0b1020";
+          ctx.font = `${shield.radius * 1.4}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("🛡️", shield.x, shield.y + 1);
         });
       };
 
@@ -1211,6 +1216,11 @@
           ctx.strokeStyle = "#ffb703";
           ctx.lineWidth = 2;
           ctx.stroke();
+          ctx.fillStyle = "#1f1400";
+          ctx.font = `${coin.radius * 1.5}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("🪙", coin.x, coin.y);
           ctx.fillStyle = "#1f1400";
           ctx.font = "12px sans-serif";
           ctx.textAlign = "center";
@@ -1227,6 +1237,11 @@
           ctx.arc(cloud.x + 2, cloud.y - 6, cloud.radius * 0.9, 0, Math.PI * 2);
           ctx.arc(cloud.x + 16, cloud.y + 2, cloud.radius * 0.6, 0, Math.PI * 2);
           ctx.fill();
+          ctx.fillStyle = "#4a5b7a";
+          ctx.font = `${cloud.radius * 1.6}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("☁️", cloud.x, cloud.y);
         });
       };
 
@@ -1241,6 +1256,11 @@
           ctx.lineTo(bolt.x - 4, bolt.y + 2);
           ctx.lineTo(bolt.x + 6, bolt.y + 12);
           ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.font = `${bolt.radius * 1.6}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("⚡", bolt.x, bolt.y);
         });
       };
 
@@ -1262,6 +1282,11 @@
             ctx.lineTo(sun.x + Math.cos(angle) * outer, sun.y + Math.sin(angle) * outer);
             ctx.stroke();
           }
+          ctx.fillStyle = "#8a5a00";
+          ctx.font = `${sun.radius * 1.6}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("☀️", sun.x, sun.y + 1);
         });
       };
 
