@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>비사이로 막가</title>
+    <link rel="icon" href="favicon.svg?v=2025-01-24-1" />
     <style>
       :root {
         color-scheme: light;
@@ -615,10 +616,10 @@
           <li>비를 피할수록 점수가 오르고, 점수는 게임 머니로 누적됩니다.</li>
           <li>부활권을 사용하면 점수를 유지한 채 이어서 시작할 수 있습니다.</li>
           <li>프로필 설정에서 닉네임과 캐릭터를 변경할 수 있습니다.</li>
-          <li><strong>🧹 필사기</strong>: 3초 동안 화면 전체로 퍼지며 비를 정리합니다. 시작 시 2회 제공되며 500점마다 1회 충전됩니다.</li>
-          <li>캐릭터: 회장님, 선생님, 공주, 장군 중 선택할 수 있습니다.</li>
-          <li><strong>🛡️ 보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다.</li>
-          <li><strong><span class="rainbow-emoji">☂️</span> 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다.</li>
+          <li><strong>🧹 필사기</strong>: 3초 동안 1초 간격으로 3회 퍼지며 비를 정리합니다. 시작 시 2회 제공되며 500점마다 1회 충전됩니다.</li>
+          <li>캐릭터: 회장님, 선생님, 공주, 슈퍼맨 중 선택할 수 있습니다.</li>
+          <li><strong>🛡️ 보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
+          <li><strong><span class="rainbow-emoji">☂️</span> 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
           <li><strong>🪙 코인</strong>: 100/200/300/500원 가치로 떨어집니다.</li>
           <li><strong>☁️ 구름</strong>: 5초간 비를 멈추고, 이후 3초간 천천히 내립니다.</li>
           <li><strong>⚡ 번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
@@ -647,6 +648,8 @@
     </div>
 
     <script>
+      const APP_VERSION = "2025-01-24-1";
+      const runApp = async () => {
       const canvas = document.getElementById("rain-canvas");
       const ctx = canvas.getContext("2d");
       const overlay = document.getElementById("overlay");
@@ -775,6 +778,68 @@
           }
         },
       };
+
+      const versionKey = "rain-run-app-version";
+      const clearIndexedDB = async () => {
+        if (!window.indexedDB || !indexedDB.databases) return;
+        const databases = await indexedDB.databases();
+        await Promise.all(
+          databases.map((db) => {
+            if (!db.name) return Promise.resolve();
+            return new Promise((resolve) => {
+              const request = indexedDB.deleteDatabase(db.name);
+              request.onsuccess = () => resolve();
+              request.onerror = () => resolve();
+              request.onblocked = () => resolve();
+            });
+          })
+        );
+      };
+
+      const clearCaches = async () => {
+        if (!("caches" in window)) return;
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      };
+
+      const unregisterServiceWorkers = async () => {
+        if (!("serviceWorker" in navigator)) return;
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      };
+
+      const resetForVersionChange = async () => {
+        const storedVersion = safeStorage.getItem(versionKey);
+        if (storedVersion === APP_VERSION) {
+          return false;
+        }
+        if (storedVersion !== null) {
+          try {
+            window.localStorage.clear();
+          } catch (error) {
+            // Ignore storage clearing issues.
+          }
+          try {
+            window.sessionStorage?.clear();
+          } catch (error) {
+            // Ignore session storage clearing issues.
+          }
+          try {
+            safeStorage.setItem(versionKey, APP_VERSION);
+          } catch (error) {
+            // Ignore storage write issues.
+          }
+          await Promise.all([clearIndexedDB(), clearCaches(), unregisterServiceWorkers()]);
+          window.location.reload();
+          return true;
+        }
+        safeStorage.setItem(versionKey, APP_VERSION);
+        return false;
+      };
+
+      if (await resetForVersionChange()) {
+        return;
+      }
 
       const bestScoreKey = "rain-run-best";
       const historyKey = "rain-run-history";
@@ -931,8 +996,14 @@
         umbrellaStatusEl.textContent =
           state.umbrellaActive > 0 ? state.umbrellaActive : state.umbrellaInventory;
         if (state.umbrellaActive > 0) {
-          umbrellaStatusEl.style.color = getShieldColor(state.umbrellaActive);
+          if (state.umbrellaActive >= settings.shieldMaxStack) {
+            applyRainbowText(umbrellaStatusEl);
+          } else {
+            clearRainbowText(umbrellaStatusEl);
+            umbrellaStatusEl.style.color = getShieldColor(state.umbrellaActive);
+          }
         } else {
+          clearRainbowText(umbrellaStatusEl);
           umbrellaStatusEl.style.color = "#7fd3ff";
         }
         umbrellaToUseEl.textContent = state.umbrellaToUse;
@@ -1000,10 +1071,16 @@
         if (state.shieldCharges > 0) {
           const remaining = Math.max(0, Math.ceil((state.shieldActiveUntil - Date.now()) / 1000));
           shieldStatusEl.textContent = `${state.shieldCharges}개 · ${remaining}s`;
-          shieldStatusEl.style.color = getShieldColor(state.shieldCharges);
+          if (state.shieldCharges >= settings.shieldMaxStack) {
+            applyRainbowText(shieldStatusEl);
+          } else {
+            clearRainbowText(shieldStatusEl);
+            shieldStatusEl.style.color = getShieldColor(state.shieldCharges);
+          }
           return;
         }
         shieldStatusEl.textContent = "없음";
+        clearRainbowText(shieldStatusEl);
         shieldStatusEl.style.color = "#7fd3ff";
       };
 
@@ -1012,6 +1089,37 @@
         const amount = 1 + Math.min(difficultyTier, settings.maxExtraDrops);
         rainAmountEl.textContent = String(amount);
         rainSpeedEl.textContent = speedMultiplier.toFixed(2);
+      };
+
+      const createRainbowGradient = (centerX, centerY, radius) => {
+        const gradient = ctx.createLinearGradient(
+          centerX - radius,
+          centerY - radius,
+          centerX + radius,
+          centerY + radius
+        );
+        gradient.addColorStop(0, "#ff4d4f");
+        gradient.addColorStop(0.17, "#ffa940");
+        gradient.addColorStop(0.33, "#fadb14");
+        gradient.addColorStop(0.5, "#73d13d");
+        gradient.addColorStop(0.67, "#40a9ff");
+        gradient.addColorStop(0.83, "#597ef7");
+        gradient.addColorStop(1, "#9254de");
+        return gradient;
+      };
+
+      const applyRainbowText = (element) => {
+        element.style.background =
+          "linear-gradient(90deg, #ff4d4f, #ffa940, #fadb14, #73d13d, #40a9ff, #597ef7, #9254de)";
+        element.style.webkitBackgroundClip = "text";
+        element.style.backgroundClip = "text";
+        element.style.color = "transparent";
+      };
+
+      const clearRainbowText = (element) => {
+        element.style.background = "";
+        element.style.webkitBackgroundClip = "";
+        element.style.backgroundClip = "";
       };
 
       const getSpeedTier = () => {
@@ -1554,20 +1662,26 @@
           const centerX = player.x + size.width / 2;
           const centerY = player.y + size.height / 2;
           const radius = Math.max(size.width, size.height) * 0.9;
-          ctx.strokeStyle = getShieldColor(state.shieldCharges);
+          ctx.strokeStyle =
+            state.shieldCharges >= settings.shieldMaxStack
+              ? createRainbowGradient(centerX, centerY, radius)
+              : getShieldColor(state.shieldCharges);
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
           ctx.stroke();
         }
         if (state.umbrellaActive > 0) {
-          const umbrellaColor = getShieldColor(state.umbrellaActive);
-          ctx.strokeStyle = umbrellaColor;
-          ctx.lineWidth = 3;
-          ctx.beginPath();
           const umbrellaCenterX = player.x + size.width / 2;
           const umbrellaCenterY = player.y - 12;
           const umbrellaRadius = 18;
+          const umbrellaColor =
+            state.umbrellaActive >= settings.shieldMaxStack
+              ? createRainbowGradient(umbrellaCenterX, umbrellaCenterY, umbrellaRadius)
+              : getShieldColor(state.umbrellaActive);
+          ctx.strokeStyle = umbrellaColor;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
           ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius, Math.PI, 0);
           ctx.stroke();
           ctx.beginPath();
@@ -1894,6 +2008,8 @@
       updateShieldStatus();
       updateRainStats(state.difficultyTier, state.speedMultiplier);
       showMenu();
+      };
+      runApp();
     </script>
   </body>
 </html>
