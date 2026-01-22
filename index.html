@@ -92,6 +92,7 @@
         border-radius: 12px;
         padding: 8px 12px;
         border: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
       }
 
       .stage {
@@ -481,7 +482,10 @@
       <header class="game__header">
         <div>
           <h1>비사이로 막가</h1>
-          <p>어릴 적 장난스러운 말처럼, 비 사이를 터치로 피해보세요.</p>
+          <div class="game__footer-meta">
+            <div>닉네임: <span id="player-name">게스트</span></div>
+            <div>캐릭터: <span id="player-character">공주</span></div>
+          </div>
         </div>
         <div class="hud__stats hud__stats--header">
           <div>레벨: <span id="level">1</span></div>
@@ -555,10 +559,6 @@
       </div>
 
       <footer class="game__footer">
-        <div class="game__footer-meta">
-          <div>닉네임: <span id="player-name">게스트</span></div>
-          <div>캐릭터: <span id="player-character">공주</span></div>
-        </div>
         <p>팁: 하단 패드를 드래그해서 이동해보세요.</p>
       </footer>
     </div>
