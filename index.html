@@ -815,7 +815,7 @@
         cloudSlowDuration: 3000,
         cloudSlowFactor: 0.6,
         sunInterval: 15000,
-        sunRadius: 14,
+        sunRadius: 9,
         shieldMaxStack: 7,
         reviveCost: 500,
         umbrellaCost: 300,
@@ -832,7 +832,7 @@
         { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
         { id: "teacher", name: "선생님", icon: "🏃‍♀️", wipeEmoji: "📚" },
         { id: "princess", name: "공주", icon: "💃", wipeEmoji: "💖" },
-        { id: "general", name: "슈퍼맨", icon: "🦸‍♂️", wipeEmoji: "👊" },
+        { id: "general", name: "슈퍼맨", icon: "🦸", wipeEmoji: "👊" },
       ];
 
       const showMenu = () => {
@@ -1553,19 +1553,7 @@
           const centerX = player.x + size.width / 2;
           const centerY = player.y + size.height / 2;
           const radius = Math.max(size.width, size.height) * 0.9;
-          const gradient = ctx.createLinearGradient(
-            centerX - radius,
-            centerY - radius,
-            centerX + radius,
-            centerY + radius
-          );
-          gradient.addColorStop(0, "#ff4d4f");
-          gradient.addColorStop(0.2, "#ffa940");
-          gradient.addColorStop(0.4, "#fadb14");
-          gradient.addColorStop(0.6, "#73d13d");
-          gradient.addColorStop(0.8, "#40a9ff");
-          gradient.addColorStop(1, "#9254de");
-          ctx.strokeStyle = gradient;
+          ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 4;
           ctx.beginPath();
           ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -1581,6 +1569,11 @@
           ctx.moveTo(player.x + size.width / 2, player.y - 12);
           ctx.lineTo(player.x + size.width / 2, player.y + 6);
           ctx.stroke();
+          ctx.font = `${size.width * 0.8}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = getShieldColor(state.umbrellaActive);
+          ctx.fillText("☂️", player.x + size.width / 2, player.y - 18);
         }
       };
 
@@ -1591,17 +1584,21 @@
         const centerX = width / 2;
         const centerY = height / 2;
         const maxRadius = Math.hypot(width, height) * 0.6;
-        const progress = Math.min(
+        const elapsed = Date.now() - state.wipeStartTime;
+        const waveDuration = settings.wipeDuration / 3;
+        const waveIndex = Math.min(2, Math.floor(elapsed / waveDuration));
+        const waveProgress = Math.min(
           1,
-          (Date.now() - state.wipeStartTime) / settings.wipeDuration
+          (elapsed - waveIndex * waveDuration) / waveDuration
         );
-        const radius = maxRadius * progress;
+        const radius = maxRadius * waveProgress;
         const count = 14;
         ctx.font = `${Math.max(18, width * 0.03)}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         for (let i = 0; i < count; i += 1) {
-          const angle = (Math.PI * 2 * i) / count + progress * Math.PI * 2;
+          const angle =
+            (Math.PI * 2 * i) / count + (waveProgress + waveIndex) * Math.PI * 2;
           ctx.fillText(
             character.wipeEmoji,
             centerX + Math.cos(angle) * radius,
