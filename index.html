@@ -198,7 +198,23 @@
 
       .game__footer {
         color: #9eb2d6;
-        text-align: right;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .game__footer-meta {
+        display: flex;
+        gap: 16px;
+        color: #b7c6e6;
+        font-size: 0.9rem;
+      }
+
+      .game__footer-meta span {
+        color: #7fd3ff;
+        font-weight: 600;
       }
 
       @media (max-width: 640px) {
@@ -235,13 +251,15 @@
 
       .action-bar {
         display: flex;
-        justify-content: center;
+        justify-content: flex-end;
       }
 
       .wipe-button {
         display: inline-flex;
         align-items: center;
         gap: 8px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
       }
 
       .wipe-button[disabled] {
@@ -474,11 +492,6 @@
         <div>우산: <span id="umbrella-status">0</span></div>
       </div>
 
-      <div class="game__meta">
-        <div>닉네임: <span id="player-name">게스트</span></div>
-        <div>캐릭터: <span id="player-character">공주</span></div>
-      </div>
-
       <div class="stage">
         <canvas id="rain-canvas" aria-label="비사이로 막가 게임 화면"></canvas>
         <div id="overlay" class="overlay overlay--visible">
@@ -522,18 +535,21 @@
         </div>
       </div>
 
-      <div class="action-bar">
-        <button id="wipe" type="button" class="button--ghost wipe-button">
-          필사기 <span id="wipe-count">2</span>
-        </button>
-      </div>
-
       <div class="control">
         <div class="control__label">여기에서 드래그하여 이동</div>
         <div id="control-pad" class="control__pad"></div>
       </div>
 
       <footer class="game__footer">
+        <div class="game__footer-meta">
+          <div>닉네임: <span id="player-name">게스트</span></div>
+          <div>캐릭터: <span id="player-character">공주</span></div>
+        </div>
+        <div class="action-bar">
+          <button id="wipe" type="button" class="button--ghost wipe-button">
+            🧹 필사기 <span id="wipe-count">2</span>
+          </button>
+        </div>
         <p>팁: 하단 패드를 드래그해서 이동해보세요.</p>
       </footer>
     </div>
@@ -582,6 +598,9 @@
           <li>하단 패드에서 드래그하여 캐릭터를 이동합니다.</li>
           <li>비를 피할수록 점수가 오르고, 점수는 게임 머니로 누적됩니다.</li>
           <li>부활권을 사용하면 점수를 유지한 채 이어서 시작할 수 있습니다.</li>
+          <li>프로필 설정에서 닉네임과 캐릭터를 변경할 수 있습니다.</li>
+          <li><strong>🧹 필사기</strong>: 3초 동안 화면 전체로 퍼지며 비를 정리합니다. 시작 시 2회 제공되며 500점마다 1회 충전됩니다.</li>
+          <li>캐릭터: 회장님, 선생님, 공주, 장군 중 선택할 수 있습니다.</li>
           <li><strong>🛡️ 보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다.</li>
           <li><strong>☂️ 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다.</li>
           <li><strong>🪙 코인</strong>: 100/200/300/500원 가치로 떨어집니다.</li>
@@ -795,9 +814,9 @@
 
       const characters = [
         { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
-        { id: "teacher", name: "선생님", icon: "🧑‍🏫", wipeEmoji: "📚" },
+        { id: "teacher", name: "선생님", icon: "👩‍🏫", wipeEmoji: "📚" },
         { id: "princess", name: "공주", icon: "👸", wipeEmoji: "💖" },
-        { id: "general", name: "장군", icon: "🪖", wipeEmoji: "⚔️" },
+        { id: "general", name: "장군", icon: "🧑‍✈️", wipeEmoji: "⚔️" },
       ];
 
       const showMenu = () => {
