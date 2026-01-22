@@ -824,6 +824,7 @@
         slowFactor: 0.6,
         pickupPaddingX: 8,
         wipeDuration: 3000,
+        wipeWaveInterval: 1000,
         wipeChargeScore: 500,
         wipeMaxCharges: 2,
       };
@@ -832,7 +833,7 @@
         { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
         { id: "teacher", name: "선생님", icon: "🏃‍♀️", wipeEmoji: "📚" },
         { id: "princess", name: "공주", icon: "💃", wipeEmoji: "💖" },
-        { id: "general", name: "슈퍼맨", icon: "🦸", wipeEmoji: "👊" },
+        { id: "general", name: "슈퍼맨", icon: "🦸‍♂️", wipeEmoji: "👊" },
       ];
 
       const showMenu = () => {
@@ -1560,20 +1561,23 @@
           ctx.stroke();
         }
         if (state.umbrellaActive > 0) {
-          ctx.strokeStyle = getShieldColor(state.umbrellaActive);
+          const umbrellaColor = getShieldColor(state.umbrellaActive);
+          ctx.strokeStyle = umbrellaColor;
           ctx.lineWidth = 3;
           ctx.beginPath();
-          ctx.arc(player.x + size.width / 2, player.y - 12, 18, Math.PI, 0);
+          const umbrellaCenterX = player.x + size.width / 2;
+          const umbrellaCenterY = player.y - 12;
+          const umbrellaRadius = 18;
+          ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius, Math.PI, 0);
           ctx.stroke();
           ctx.beginPath();
-          ctx.moveTo(player.x + size.width / 2, player.y - 12);
-          ctx.lineTo(player.x + size.width / 2, player.y + 6);
+          ctx.moveTo(umbrellaCenterX, umbrellaCenterY);
+          ctx.lineTo(umbrellaCenterX, player.y + 6);
           ctx.stroke();
-          ctx.font = `${size.width * 0.8}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillStyle = getShieldColor(state.umbrellaActive);
-          ctx.fillText("☂️", player.x + size.width / 2, player.y - 18);
+          ctx.fillStyle = umbrellaColor;
+          ctx.beginPath();
+          ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius - 2, Math.PI, 0);
+          ctx.fill();
         }
       };
 
@@ -1585,7 +1589,7 @@
         const centerY = height / 2;
         const maxRadius = Math.hypot(width, height) * 0.6;
         const elapsed = Date.now() - state.wipeStartTime;
-        const waveDuration = settings.wipeDuration / 3;
+        const waveDuration = settings.wipeWaveInterval;
         const waveIndex = Math.min(2, Math.floor(elapsed / waveDuration));
         const waveProgress = Math.min(
           1,
