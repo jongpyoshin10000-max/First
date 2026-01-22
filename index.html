@@ -283,6 +283,19 @@
         min-height: 1.2em;
       }
 
+      .guide-list {
+        margin: 0;
+        padding-left: 18px;
+        color: #cfe1ff;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .guide-list strong {
+        color: #7fd3ff;
+      }
+
       .modal {
         position: fixed;
         inset: 0;
@@ -400,6 +413,7 @@
               <button id="start" type="button">게임 시작</button>
               <button id="history" type="button" class="button--ghost">기록 보기</button>
               <button id="shop" type="button" class="button--ghost">상점</button>
+              <button id="guide" type="button" class="button--ghost">게임설명</button>
               <button id="fullscreen" type="button" class="button--ghost">전체화면</button>
             </div>
           </div>
@@ -463,6 +477,26 @@
       </div>
     </div>
 
+    <div id="guide-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>게임설명</h3>
+          <button id="close-guide" class="modal__close" type="button">닫기</button>
+        </div>
+        <ul class="guide-list">
+          <li>하단 패드에서 드래그하여 캐릭터를 이동합니다.</li>
+          <li>비를 피할수록 점수가 오르고, 점수는 게임 머니로 누적됩니다.</li>
+          <li>부활권을 사용하면 점수를 유지한 채 이어서 시작할 수 있습니다.</li>
+          <li><strong>보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다.</li>
+          <li><strong>우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다.</li>
+          <li><strong>코인</strong>: 100/200/300/500원 가치로 떨어집니다.</li>
+          <li><strong>구름</strong>: 5초간 비를 멈추고, 이후 3초간 천천히 내립니다.</li>
+          <li><strong>번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
+          <li><strong>해</strong>: 이전 레벨의 비의 양과 속도로 잠시 낮춰줍니다.</li>
+        </ul>
+      </div>
+    </div>
+
     <script>
       const canvas = document.getElementById("rain-canvas");
       const ctx = canvas.getContext("2d");
@@ -475,6 +509,9 @@
       const historyFromResultButton = document.getElementById("history-from-result");
       const shopFromResultButton = document.getElementById("shop-from-result");
       const shopButton = document.getElementById("shop");
+      const guideButton = document.getElementById("guide");
+      const guideModal = document.getElementById("guide-modal");
+      const closeGuideButton = document.getElementById("close-guide");
       const shopModal = document.getElementById("shop-modal");
       const closeShopButton = document.getElementById("close-shop");
       const buyReviveButton = document.getElementById("buy-revive");
@@ -1351,6 +1388,16 @@
         shopModal.setAttribute("aria-hidden", "true");
       };
 
+      const openGuide = () => {
+        guideModal.classList.add("modal--open");
+        guideModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeGuide = () => {
+        guideModal.classList.remove("modal--open");
+        guideModal.setAttribute("aria-hidden", "true");
+      };
+
       const buyRevive = () => {
         if (state.currency < settings.reviveCost) {
           setShopMessage("게임 머니가 부족합니다.");
@@ -1438,12 +1485,19 @@
       historyFromResultButton.addEventListener("click", openHistory);
       shopButton.addEventListener("click", openShop);
       shopFromResultButton.addEventListener("click", openShop);
+      guideButton.addEventListener("click", openGuide);
       buyReviveButton.addEventListener("click", buyRevive);
       buyUmbrellaButton.addEventListener("click", buyUmbrella);
       closeShopButton.addEventListener("click", closeShop);
+      closeGuideButton.addEventListener("click", closeGuide);
       shopModal.addEventListener("click", (event) => {
         if (event.target === shopModal) {
           closeShop();
+        }
+      });
+      guideModal.addEventListener("click", (event) => {
+        if (event.target === guideModal) {
+          closeGuide();
         }
       });
       fullscreenButton.addEventListener("click", toggleFullscreen);
