@@ -622,6 +622,7 @@
           <li><strong><span class="rainbow-emoji">☂️</span> 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
           <li><strong>🪙 코인</strong>: 100/200/300/500원 가치로 떨어집니다.</li>
           <li><strong>☁️ 구름</strong>: 5초간 비를 멈추고, 이후 3초간 천천히 내립니다.</li>
+          <li>구름/필사기 사용 직후 1초 동안 비 생성량이 완만하게 조정됩니다.</li>
           <li><strong>⚡ 번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
           <li><strong>☀️ 해</strong>: 레벨/비의 양은 유지되고 비의 속도만 이전 레벨 속도로 잠시 감소합니다.</li>
         </ul>
@@ -738,6 +739,7 @@
         difficultyTier: 0,
         sunSpeedTierOverride: null,
         sunSpeedOverrideUntil: 0,
+        spawnGraceUntil: 0,
         wipeActiveUntil: 0,
         wipeStartTime: 0,
         wipeCharges: 2,
@@ -968,6 +970,7 @@
         state.rainResumeSlowUntil = 0;
         state.sunSpeedTierOverride = null;
         state.sunSpeedOverrideUntil = 0;
+        state.spawnGraceUntil = 0;
         state.wipeActiveUntil = 0;
         state.wipeStartTime = 0;
         if (!preserveScore) {
@@ -1305,10 +1308,16 @@
         updateRainStats(state.difficultyTier, state.speedMultiplier);
 
         const isRainPaused = Date.now() < state.rainPauseUntil;
+        if (isRainPaused) {
+          state.spawnTimer = 0;
+        }
         if (!isRainPaused && state.spawnTimer > spawnInterval) {
           state.spawnTimer -= spawnInterval;
           spawnDrop();
-          const extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
+          let extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
+          if (Date.now() < state.spawnGraceUntil) {
+            extraDrops = Math.min(extraDrops, 1);
+          }
           for (let i = 0; i < extraDrops; i += 1) {
             spawnDrop();
           }
@@ -1452,6 +1461,7 @@
           if (inX && inY) {
             state.rainPauseUntil = Date.now() + 5000;
             state.rainResumeSlowUntil = state.rainPauseUntil + settings.cloudSlowDuration;
+            state.spawnGraceUntil = state.rainPauseUntil + 1000;
             state.drops = [];
             state.spawnTimer = 0;
             return false;
@@ -1650,6 +1660,25 @@
         const { player } = state;
         const size = getPlayerSize();
         const character = getSelectedCharacter();
+        let umbrellaCenterX = 0;
+        let umbrellaCenterY = 0;
+        let umbrellaRadius = 0;
+        let umbrellaColor = "";
+        if (state.umbrellaActive > 0) {
+          umbrellaCenterX = player.x + size.width / 2;
+          umbrellaCenterY = player.y - 12;
+          umbrellaRadius = 18;
+          umbrellaColor =
+            state.umbrellaActive >= settings.shieldMaxStack
+              ? createRainbowGradient(umbrellaCenterX, umbrellaCenterY, umbrellaRadius)
+              : getShieldColor(state.umbrellaActive);
+          ctx.strokeStyle = umbrellaColor;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(umbrellaCenterX, umbrellaCenterY);
+          ctx.lineTo(umbrellaCenterX, player.y + 6);
+          ctx.stroke();
+        }
         ctx.font = `${size.width * 1.4}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -1672,21 +1701,10 @@
           ctx.stroke();
         }
         if (state.umbrellaActive > 0) {
-          const umbrellaCenterX = player.x + size.width / 2;
-          const umbrellaCenterY = player.y - 12;
-          const umbrellaRadius = 18;
-          const umbrellaColor =
-            state.umbrellaActive >= settings.shieldMaxStack
-              ? createRainbowGradient(umbrellaCenterX, umbrellaCenterY, umbrellaRadius)
-              : getShieldColor(state.umbrellaActive);
           ctx.strokeStyle = umbrellaColor;
           ctx.lineWidth = 3;
           ctx.beginPath();
           ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius, Math.PI, 0);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(umbrellaCenterX, umbrellaCenterY);
-          ctx.lineTo(umbrellaCenterX, player.y + 6);
           ctx.stroke();
           ctx.fillStyle = umbrellaColor;
           ctx.beginPath();
@@ -1904,6 +1922,7 @@
         const until = Date.now() + settings.wipeDuration;
         state.drops = [];
         state.rainPauseUntil = Math.max(state.rainPauseUntil, until);
+        state.spawnGraceUntil = Math.max(state.spawnGraceUntil, until + 1000);
         state.wipeActiveUntil = Math.max(state.wipeActiveUntil, until);
         state.wipeStartTime = Date.now();
         state.wipeCharges = Math.max(0, state.wipeCharges - 1);
