@@ -44,6 +44,13 @@
         color: #c4d4f3;
       }
 
+      .game__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
       .hud {
         display: flex;
         justify-content: space-between;
@@ -64,6 +71,13 @@
         gap: 2px;
         text-align: right;
         min-width: 120px;
+      }
+
+      .hud__stats--header {
+        background: rgba(10, 16, 33, 0.6);
+        border-radius: 12px;
+        padding: 8px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
       .stage {
@@ -344,8 +358,15 @@
   <body>
     <div class="game">
       <header class="game__header">
-        <h1>비사이로 막가</h1>
-        <p>어릴 적 장난스러운 말처럼, 비 사이를 터치로 피해보세요.</p>
+        <div>
+          <h1>비사이로 막가</h1>
+          <p>어릴 적 장난스러운 말처럼, 비 사이를 터치로 피해보세요.</p>
+        </div>
+        <div class="hud__stats hud__stats--header">
+          <div>레벨: <span id="level">1</span></div>
+          <div>비의 양: <span id="rain-amount">1</span></div>
+          <div>비의 속도: <span id="rain-speed">1.00</span></div>
+        </div>
       </header>
 
       <div class="hud">
@@ -355,11 +376,6 @@
         <div>부활권: <span id="revive-status">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
         <div>우산: <span id="umbrella-status">0</span></div>
-        <div class="hud__stats">
-          <div>레벨: <span id="level">1</span></div>
-          <div>비의 양: <span id="rain-amount">1</span></div>
-          <div>비의 속도: <span id="rain-speed">1.00</span></div>
-        </div>
       </div>
 
       <div class="stage">
