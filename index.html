@@ -481,6 +481,7 @@
         coins: [],
         clouds: [],
         bolts: [],
+        suns: [],
         player: {
           x: 0,
           y: 0,
@@ -493,6 +494,7 @@
         coinTimer: 0,
         cloudTimer: 0,
         boltTimer: 0,
+        sunTimer: 0,
         score: 0,
         best: 0,
         currency: 0,
@@ -511,6 +513,9 @@
         slowUntil: 0,
         rainPauseUntil: 0,
         rainResumeSlowUntil: 0,
+        sunOverrideUntil: 0,
+        sunTierOverride: 0,
+        revivesUsed: 0,
         runAwardedScore: 0,
         countdownTimer: null,
         countdownValue: 3,
@@ -554,7 +559,7 @@
         spawnInterval: 520,
         minDropSpeed: 220,
         maxDropSpeed: 420,
-        dropWidthRange: [12, 22],
+        dropWidthRange: [4, 8],
         dropHeight: 36,
         speedStep: 0.04,
         spawnScale: 0.2,
@@ -571,12 +576,15 @@
         boltDuration: 60000,
         cloudSlowDuration: 3000,
         cloudSlowFactor: 0.6,
+        sunInterval: 15000,
+        sunRadius: 14,
         shieldMaxStack: 7,
         reviveCost: 500,
         umbrellaCost: 300,
         umbrellaMaxStack: 7,
         slowDuration: 5000,
         slowFactor: 0.6,
+        pickupPaddingX: 8,
       };
 
       const showMenu = () => {
@@ -634,6 +642,7 @@
         state.coins = [];
         state.clouds = [];
         state.bolts = [];
+        state.suns = [];
         state.shieldActiveUntil = 0;
         state.shieldCharges = 0;
         state.umbrellaActive = 0;
@@ -641,6 +650,9 @@
         state.sizeEffectUntil = 0;
         state.rainPauseUntil = 0;
         state.rainResumeSlowUntil = 0;
+        state.sunOverrideUntil = 0;
+        state.sunTierOverride = 0;
+        state.revivesUsed = 0;
         state.lastTime = performance.now();
         updateScore();
       };
@@ -695,6 +707,22 @@
         shieldStatusEl.style.color = "#7fd3ff";
       };
 
+      const getEffectiveTier = () => {
+        if (Date.now() < state.sunOverrideUntil) {
+          return state.sunTierOverride;
+        }
+        return state.difficultyTier;
+      };
+
+      const lightenColor = (hex, amount) => {
+        const value = hex.replace("#", "");
+        const num = Number.parseInt(value, 16);
+        const r = Math.min(255, ((num >> 16) & 0xff) + amount);
+        const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+        const b = Math.min(255, (num & 0xff) + amount);
+        return `rgb(${r}, ${g}, ${b})`;
+      };
+
       const startCountdown = (options = {}) => {
         if (state.countdownTimer) {
           clearInterval(state.countdownTimer);
@@ -746,6 +774,7 @@
         const runRecord = {
           score: Math.floor(state.score),
           drops: state.dropsDodged,
+          revives: state.revivesUsed,
           date: new Date().toLocaleString(),
         };
         state.history.unshift(runRecord);
@@ -824,6 +853,17 @@
         });
       };
 
+      const spawnSun = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.sunRadius;
+        state.suns.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 160 + Math.random() * 60,
+        });
+      };
+
       const update = (delta) => {
         state.spawnTimer += delta;
         state.score += delta * 0.01;
@@ -837,14 +877,15 @@
           Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
         const totalSlowFactor = slowFactor * cloudSlowFactor;
         state.speedMultiplier = (1 + state.speedBonus) * totalSlowFactor;
-        const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
+        const effectiveTier = getEffectiveTier();
+        const intervalScale = 1 + effectiveTier * settings.spawnScale;
         const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
 
         const isRainPaused = Date.now() < state.rainPauseUntil;
         if (!isRainPaused && state.spawnTimer > spawnInterval) {
           state.spawnTimer -= spawnInterval;
           spawnDrop();
-          const extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
+          const extraDrops = Math.min(effectiveTier, settings.maxExtraDrops);
           for (let i = 0; i < extraDrops; i += 1) {
             spawnDrop();
           }
@@ -874,6 +915,12 @@
           spawnBolt();
         }
 
+        state.sunTimer += delta;
+        if (state.sunTimer > settings.sunInterval) {
+          state.sunTimer -= settings.sunInterval;
+          spawnSun();
+        }
+
         if (!isRainPaused) {
           state.drops.forEach((drop) => {
             drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
@@ -896,6 +943,10 @@
           bolt.y += (bolt.speed * delta) / 1000;
         });
 
+        state.suns.forEach((sun) => {
+          sun.y += (sun.speed * delta) / 1000;
+        });
+
         const { height } = canvas.getBoundingClientRect();
         state.drops = state.drops.filter((drop) => {
           if (drop.y < height) {
@@ -909,6 +960,7 @@
         state.coins = state.coins.filter((coin) => coin.y < height + coin.radius);
         state.clouds = state.clouds.filter((cloud) => cloud.y < height + cloud.radius);
         state.bolts = state.bolts.filter((bolt) => bolt.y < height + bolt.radius);
+        state.suns = state.suns.filter((sun) => sun.y < height + sun.radius);
         if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
           state.shieldCharges = 0;
           state.shieldActiveUntil = 0;
@@ -938,12 +990,11 @@
         const { player } = state;
         const size = getPlayerSize();
         state.shields = state.shields.filter((shield) => {
-          const inX = shield.x > player.x && shield.x < player.x + size.width;
+          const inX =
+            shield.x > player.x - settings.pickupPaddingX &&
+            shield.x < player.x + size.width + settings.pickupPaddingX;
           const inY = shield.y > player.y - shield.radius && shield.y < player.y + size.height;
           if (inX && inY) {
-            if (state.umbrellaActive > 0) {
-              return false;
-            }
             if (state.shieldCharges < settings.shieldMaxStack) {
               state.shieldCharges += 1;
               const baseTime = Math.max(Date.now(), state.shieldActiveUntil);
@@ -956,7 +1007,9 @@
         });
 
         state.coins = state.coins.filter((coin) => {
-          const inX = coin.x > player.x && coin.x < player.x + size.width;
+          const inX =
+            coin.x > player.x - settings.pickupPaddingX &&
+            coin.x < player.x + size.width + settings.pickupPaddingX;
           const inY = coin.y > player.y - coin.radius && coin.y < player.y + size.height;
           if (inX && inY) {
             state.currency += coin.value;
@@ -968,7 +1021,9 @@
         });
 
         state.clouds = state.clouds.filter((cloud) => {
-          const inX = cloud.x > player.x && cloud.x < player.x + size.width;
+          const inX =
+            cloud.x > player.x - settings.pickupPaddingX &&
+            cloud.x < player.x + size.width + settings.pickupPaddingX;
           const inY = cloud.y > player.y - cloud.radius && cloud.y < player.y + size.height;
           if (inX && inY) {
             state.rainPauseUntil = Date.now() + 5000;
@@ -981,10 +1036,26 @@
         });
 
         state.bolts = state.bolts.filter((bolt) => {
-          const inX = bolt.x > player.x && bolt.x < player.x + size.width;
+          const inX =
+            bolt.x > player.x - settings.pickupPaddingX &&
+            bolt.x < player.x + size.width + settings.pickupPaddingX;
           const inY = bolt.y > player.y - bolt.radius && bolt.y < player.y + size.height;
           if (inX && inY) {
             applyBoltEffect(bolt.type);
+            return false;
+          }
+          return true;
+        });
+
+        state.suns = state.suns.filter((sun) => {
+          const inX =
+            sun.x > player.x - settings.pickupPaddingX &&
+            sun.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = sun.y > player.y - sun.radius && sun.y < player.y + size.height;
+          if (inX && inY) {
+            const baseTier = Math.floor(state.score / 200);
+            state.sunTierOverride = Math.max(0, baseTier - 1);
+            state.sunOverrideUntil = Date.now() + 8000;
             return false;
           }
           return true;
@@ -1024,8 +1095,9 @@
         const { width, height } = canvas.getBoundingClientRect();
         ctx.clearRect(0, 0, width, height);
         const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        gradient.addColorStop(0, "#0d2247");
-        gradient.addColorStop(1, "#04060c");
+        const brightness = Math.min(40, getEffectiveTier() * 5);
+        gradient.addColorStop(0, lightenColor("#0d2247", brightness));
+        gradient.addColorStop(1, lightenColor("#04060c", brightness));
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, width, height);
       };
@@ -1091,6 +1163,27 @@
         });
       };
 
+      const drawSuns = () => {
+        state.suns.forEach((sun) => {
+          ctx.fillStyle = "#ffd54f";
+          ctx.beginPath();
+          ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffb300";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          for (let i = 0; i < 8; i += 1) {
+            const angle = (Math.PI * 2 * i) / 8;
+            const inner = sun.radius + 2;
+            const outer = sun.radius + 8;
+            ctx.beginPath();
+            ctx.moveTo(sun.x + Math.cos(angle) * inner, sun.y + Math.sin(angle) * inner);
+            ctx.lineTo(sun.x + Math.cos(angle) * outer, sun.y + Math.sin(angle) * outer);
+            ctx.stroke();
+          }
+        });
+      };
+
       const drawPlayer = () => {
         const { player } = state;
         const size = getPlayerSize();
@@ -1128,6 +1221,7 @@
         drawCoins();
         drawClouds();
         drawBolts();
+        drawSuns();
         drawPlayer();
         updateScore();
 
@@ -1185,7 +1279,8 @@
         }
         state.history.forEach((record) => {
           const item = document.createElement("li");
-          item.innerHTML = `<div>${record.date}</div><span>${record.score}점 · ${record.drops}회</span>`;
+          const revives = record.revives ? ` · 부활 ${record.revives}회` : "";
+          item.innerHTML = `<div>${record.date}</div><span>${record.score}점 · ${record.drops}회${revives}</span>`;
           historyList.appendChild(item);
         });
       };
@@ -1255,6 +1350,7 @@
         if (state.reviveTickets < 1) return;
         state.pendingReviveSelection = true;
         state.umbrellaToUse = 0;
+        state.revivesUsed += 1;
         updateCurrency();
         overlay.classList.add("overlay--visible");
         showMenu();
