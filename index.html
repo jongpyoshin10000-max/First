@@ -58,6 +58,14 @@
         color: #7fd3ff;
       }
 
+      .hud__stats {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        text-align: right;
+        min-width: 120px;
+      }
+
       .stage {
         position: relative;
         aspect-ratio: 16 / 9;
@@ -347,6 +355,11 @@
         <div>부활권: <span id="revive-status">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
         <div>우산: <span id="umbrella-status">0</span></div>
+        <div class="hud__stats">
+          <div>레벨: <span id="level">1</span></div>
+          <div>비의 양: <span id="rain-amount">1</span></div>
+          <div>비의 속도: <span id="rain-speed">1.00</span></div>
+        </div>
       </div>
 
       <div class="stage">
@@ -472,6 +485,9 @@
       const umbrellaToUseEl = document.getElementById("umbrella-to-use");
       const umbrellaDecreaseButton = document.getElementById("umbrella-decrease");
       const umbrellaIncreaseButton = document.getElementById("umbrella-increase");
+      const levelEl = document.getElementById("level");
+      const rainAmountEl = document.getElementById("rain-amount");
+      const rainSpeedEl = document.getElementById("rain-speed");
       const shieldStatusEl = document.getElementById("shield-status");
 
       const state = {
@@ -635,7 +651,9 @@
         state.coinTimer = 0;
         state.cloudTimer = 0;
         state.boltTimer = 0;
-        state.dropsDodged = 0;
+        if (!preserveScore) {
+          state.dropsDodged = 0;
+        }
         state.speedBonus = 0;
         state.difficultyTier = 0;
         state.shields = [];
@@ -652,7 +670,9 @@
         state.rainResumeSlowUntil = 0;
         state.sunOverrideUntil = 0;
         state.sunTierOverride = 0;
-        state.revivesUsed = 0;
+        if (!preserveScore) {
+          state.revivesUsed = 0;
+        }
         state.lastTime = performance.now();
         updateScore();
       };
@@ -705,6 +725,13 @@
         }
         shieldStatusEl.textContent = "없음";
         shieldStatusEl.style.color = "#7fd3ff";
+      };
+
+      const updateRainStats = (effectiveTier, speedMultiplier) => {
+        levelEl.textContent = String(effectiveTier + 1);
+        const amount = 1 + Math.min(effectiveTier, settings.maxExtraDrops);
+        rainAmountEl.textContent = String(amount);
+        rainSpeedEl.textContent = speedMultiplier.toFixed(2);
       };
 
       const getEffectiveTier = () => {
@@ -880,6 +907,7 @@
         const effectiveTier = getEffectiveTier();
         const intervalScale = 1 + effectiveTier * settings.spawnScale;
         const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
+        updateRainStats(effectiveTier, state.speedMultiplier);
 
         const isRainPaused = Date.now() < state.rainPauseUntil;
         if (!isRainPaused && state.spawnTimer > spawnInterval) {
@@ -1072,18 +1100,18 @@
           if (!isHit) {
             return false;
           }
-          if (state.umbrellaActive > 0) {
-            state.umbrellaActive -= 1;
-            updateCurrency();
-            drop.y = canvas.getBoundingClientRect().height + drop.height;
-            return false;
-          }
           if (state.shieldCharges > 0) {
             state.shieldCharges -= 1;
             if (state.shieldCharges === 0) {
               state.shieldActiveUntil = 0;
             }
             updateShieldStatus();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
+          if (state.umbrellaActive > 0) {
+            state.umbrellaActive -= 1;
+            updateCurrency();
             drop.y = canvas.getBoundingClientRect().height + drop.height;
             return false;
           }
@@ -1095,7 +1123,7 @@
         const { width, height } = canvas.getBoundingClientRect();
         ctx.clearRect(0, 0, width, height);
         const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        const brightness = Math.min(40, getEffectiveTier() * 5);
+        const brightness = Math.min(120, getEffectiveTier() * 15);
         gradient.addColorStop(0, lightenColor("#0d2247", brightness));
         gradient.addColorStop(1, lightenColor("#04060c", brightness));
         ctx.fillStyle = gradient;
@@ -1191,7 +1219,7 @@
         ctx.fillRect(player.x, player.y, size.width, size.height);
         ctx.fillStyle = "#2c3050";
         ctx.fillRect(player.x + size.width * 0.4, player.y - 14, 8, 14);
-        if (state.shieldCharges > 0 && state.umbrellaActive === 0) {
+        if (state.shieldCharges > 0) {
           ctx.strokeStyle = getShieldColor(state.shieldCharges);
           ctx.lineWidth = 3;
           ctx.strokeRect(player.x - 6, player.y - 6, size.width + 12, size.height + 12);
@@ -1415,6 +1443,7 @@
       updateScore();
       updateCurrency();
       updateShieldStatus();
+      updateRainStats(getEffectiveTier(), state.speedMultiplier);
       showMenu();
     </script>
   </body>
