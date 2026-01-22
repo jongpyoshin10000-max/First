@@ -575,6 +575,8 @@
         dropsDodged: 0,
         speedBonus: 0,
         difficultyTier: 0,
+        sunSpeedTierOverride: null,
+        sunSpeedOverrideUntil: 0,
         shieldActiveUntil: 0,
         shieldCharges: 0,
         sizeMultiplier: 1,
@@ -582,7 +584,6 @@
         slowUntil: 0,
         rainPauseUntil: 0,
         rainResumeSlowUntil: 0,
-        sunSpeedOffset: 0,
         revivesUsed: 0,
         runAwardedScore: 0,
         countdownTimer: null,
@@ -720,7 +721,8 @@
         state.sizeEffectUntil = 0;
         state.rainPauseUntil = 0;
         state.rainResumeSlowUntil = 0;
-        state.sunSpeedOffset = 0;
+        state.sunSpeedTierOverride = null;
+        state.sunSpeedOverrideUntil = 0;
         if (!preserveScore) {
           state.revivesUsed = 0;
         }
@@ -778,16 +780,16 @@
         shieldStatusEl.style.color = "#7fd3ff";
       };
 
-      const updateRainStats = (effectiveTier, speedMultiplier) => {
-        levelEl.textContent = String(effectiveTier + 1);
-        const amount = 1 + Math.min(effectiveTier, settings.maxExtraDrops);
+      const updateRainStats = (difficultyTier, speedMultiplier) => {
+        levelEl.textContent = String(difficultyTier + 1);
+        const amount = 1 + Math.min(difficultyTier, settings.maxExtraDrops);
         rainAmountEl.textContent = String(amount);
         rainSpeedEl.textContent = speedMultiplier.toFixed(2);
       };
 
-      const getEffectiveTier = () => {
-        if (Date.now() < state.sunOverrideUntil) {
-          return state.sunTierOverride;
+      const getSpeedTier = () => {
+        if (Date.now() < state.sunSpeedOverrideUntil) {
+          return state.sunSpeedTierOverride ?? state.difficultyTier;
         }
         return state.difficultyTier;
       };
@@ -946,7 +948,8 @@
         state.spawnTimer += delta;
         state.score += delta * 0.01;
         state.difficultyTier = Math.floor(state.score / 200);
-        state.speedBonus = Math.pow(state.difficultyTier, 2) * settings.speedStep;
+        const speedTier = getSpeedTier();
+        state.speedBonus = Math.pow(speedTier, 2) * settings.speedStep;
         const slowFactor =
           Date.now() < state.slowUntil || Date.now() < state.rainResumeSlowUntil
             ? settings.slowFactor
@@ -955,16 +958,15 @@
           Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
         const totalSlowFactor = slowFactor * cloudSlowFactor;
         state.speedMultiplier = (1 + state.speedBonus) * totalSlowFactor;
-        const effectiveTier = getEffectiveTier();
-        const intervalScale = 1 + effectiveTier * settings.spawnScale;
+        const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
         const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
-        updateRainStats(effectiveTier, state.speedMultiplier);
+        updateRainStats(state.difficultyTier, state.speedMultiplier);
 
         const isRainPaused = Date.now() < state.rainPauseUntil;
         if (!isRainPaused && state.spawnTimer > spawnInterval) {
           state.spawnTimer -= spawnInterval;
           spawnDrop();
-          const extraDrops = Math.min(effectiveTier, settings.maxExtraDrops);
+          const extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
           for (let i = 0; i < extraDrops; i += 1) {
             spawnDrop();
           }
@@ -1133,8 +1135,8 @@
           const inY = sun.y > player.y - sun.radius && sun.y < player.y + size.height;
           if (inX && inY) {
             const baseTier = Math.floor(state.score / 200);
-            state.sunTierOverride = Math.max(0, baseTier - 1);
-            state.sunOverrideUntil = Date.now() + 8000;
+            state.sunSpeedTierOverride = Math.max(0, baseTier - 1);
+            state.sunSpeedOverrideUntil = Date.now() + 8000;
             return false;
           }
           return true;
@@ -1174,7 +1176,7 @@
         const { width, height } = canvas.getBoundingClientRect();
         ctx.clearRect(0, 0, width, height);
         const gradient = ctx.createLinearGradient(0, 0, 0, height);
-        const brightness = Math.min(120, getEffectiveTier() * 15);
+        const brightness = Math.min(120, state.difficultyTier * 15);
         gradient.addColorStop(0, lightenColor("#0d2247", brightness));
         gradient.addColorStop(1, lightenColor("#04060c", brightness));
         ctx.fillStyle = gradient;
@@ -1528,7 +1530,7 @@
       updateScore();
       updateCurrency();
       updateShieldStatus();
-      updateRainStats(getEffectiveTier(), state.speedMultiplier);
+      updateRainStats(state.difficultyTier, state.speedMultiplier);
       showMenu();
     </script>
   </body>
