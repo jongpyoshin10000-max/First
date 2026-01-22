@@ -73,6 +73,20 @@
         min-width: 120px;
       }
 
+      .game__meta {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        font-size: 0.9rem;
+        color: #b7c6e6;
+        padding: 4px 8px 0;
+      }
+
+      .game__meta span {
+        color: #7fd3ff;
+        font-weight: 600;
+      }
+
       .hud__stats--header {
         background: rgba(10, 16, 33, 0.6);
         border-radius: 12px;
@@ -217,6 +231,22 @@
         display: flex;
         flex-direction: column;
         gap: 8px;
+      }
+
+      .action-bar {
+        display: flex;
+        justify-content: center;
+      }
+
+      .wipe-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .wipe-button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .control__label {
@@ -432,8 +462,6 @@
           <div>레벨: <span id="level">1</span></div>
           <div>비의 양: <span id="rain-amount">1</span></div>
           <div>비의 속도: <span id="rain-speed">1.00</span></div>
-          <div>닉네임: <span id="player-name">게스트</span></div>
-          <div>캐릭터: <span id="player-character">학생</span></div>
         </div>
       </header>
 
@@ -444,7 +472,11 @@
         <div>부활권: <span id="revive-status">0</span></div>
         <div>보호막: <span id="shield-status">없음</span></div>
         <div>우산: <span id="umbrella-status">0</span></div>
-        <button id="wipe" type="button" class="button--ghost">필사기</button>
+      </div>
+
+      <div class="game__meta">
+        <div>닉네임: <span id="player-name">게스트</span></div>
+        <div>캐릭터: <span id="player-character">공주</span></div>
       </div>
 
       <div class="stage">
@@ -488,6 +520,12 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="action-bar">
+        <button id="wipe" type="button" class="button--ghost wipe-button">
+          필사기 <span id="wipe-count">2</span>
+        </button>
       </div>
 
       <div class="control">
@@ -626,6 +664,7 @@
       const playerNameEl = document.getElementById("player-name");
       const playerCharacterEl = document.getElementById("player-character");
       const wipeButton = document.getElementById("wipe");
+      const wipeCountEl = document.getElementById("wipe-count");
 
       const state = {
         running: false,
@@ -662,8 +701,11 @@
         sunSpeedTierOverride: null,
         sunSpeedOverrideUntil: 0,
         wipeActiveUntil: 0,
+        wipeStartTime: 0,
+        wipeCharges: 2,
+        nextWipeScore: 500,
         profileName: "게스트",
-        selectedCharacterId: "student",
+        selectedCharacterId: "princess",
         shieldActiveUntil: 0,
         shieldCharges: 0,
         sizeMultiplier: 1,
@@ -712,8 +754,9 @@
       state.currency = storedCurrency === null ? 2000 : Number.parseInt(storedCurrency, 10) || 0;
       state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
       state.umbrellaInventory = Number.parseInt(safeStorage.getItem(umbrellaKey), 10) || 0;
-      state.profileName = safeStorage.getItem(profileNameKey) || "게스트";
-      state.selectedCharacterId = safeStorage.getItem(profileCharacterKey) || "student";
+      const storedProfileName = safeStorage.getItem(profileNameKey);
+      state.profileName = storedProfileName ?? "게스트";
+      state.selectedCharacterId = safeStorage.getItem(profileCharacterKey) || "princess";
 
       const settings = {
         spawnInterval: 520,
@@ -746,12 +789,14 @@
         slowFactor: 0.6,
         pickupPaddingX: 8,
         wipeDuration: 3000,
+        wipeChargeScore: 500,
+        wipeMaxCharges: 2,
       };
 
       const characters = [
         { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
         { id: "teacher", name: "선생님", icon: "🧑‍🏫", wipeEmoji: "📚" },
-        { id: "student", name: "학생", icon: "🧑‍🎓", wipeEmoji: "🍬" },
+        { id: "princess", name: "공주", icon: "👸", wipeEmoji: "💖" },
         { id: "general", name: "장군", icon: "🪖", wipeEmoji: "⚔️" },
       ];
 
@@ -823,6 +868,11 @@
         state.sunSpeedTierOverride = null;
         state.sunSpeedOverrideUntil = 0;
         state.wipeActiveUntil = 0;
+        state.wipeStartTime = 0;
+        if (!preserveScore) {
+          state.wipeCharges = settings.wipeMaxCharges;
+          state.nextWipeScore = settings.wipeChargeScore;
+        }
         if (!preserveScore) {
           state.revivesUsed = 0;
         }
@@ -881,13 +931,20 @@
         playerNameEl.textContent = state.profileName || "게스트";
         const selected = getSelectedCharacter();
         playerCharacterEl.textContent = selected.name;
-        profileNameInput.value = state.profileName;
+        if (document.activeElement !== profileNameInput) {
+          profileNameInput.value = state.profileName;
+        }
         characterOptions.querySelectorAll(".character-button").forEach((button) => {
           button.classList.toggle(
             "character-button--active",
             button.dataset.characterId === state.selectedCharacterId
           );
         });
+      };
+
+      const updateWipeUI = () => {
+        wipeCountEl.textContent = String(state.wipeCharges);
+        wipeButton.disabled = state.wipeCharges < 1 || !state.running;
       };
 
       const getShieldColor = (charges) => {
@@ -1082,6 +1139,13 @@
         state.spawnTimer += delta;
         state.score += delta * 0.01;
         state.difficultyTier = Math.floor(state.score / 200);
+        while (
+          state.score >= state.nextWipeScore &&
+          state.wipeCharges < settings.wipeMaxCharges
+        ) {
+          state.wipeCharges += 1;
+          state.nextWipeScore += settings.wipeChargeScore;
+        }
         const speedTier = getSpeedTier();
         state.speedBonus = Math.pow(speedTier, 2) * settings.speedStep;
         const slowFactor =
@@ -1185,6 +1249,7 @@
           state.sizeEffectUntil = 0;
         }
         updateShieldStatus();
+        updateWipeUI();
       };
 
       const getPlayerSize = () => ({
@@ -1465,19 +1530,31 @@
           ctx.lineTo(player.x + size.width / 2, player.y + 6);
           ctx.stroke();
         }
-        if (Date.now() < state.wipeActiveUntil) {
-          const wipeEmoji = character.wipeEmoji;
-          const burstCount = 6;
-          ctx.font = `${size.width}px sans-serif`;
-          for (let i = 0; i < burstCount; i += 1) {
-            const angle = (Math.PI * 2 * i) / burstCount;
-            const radius = size.width * 1.6;
-            ctx.fillText(
-              wipeEmoji,
-              player.x + size.width / 2 + Math.cos(angle) * radius,
-              player.y + size.height / 2 + Math.sin(angle) * radius
-            );
-          }
+      };
+
+      const drawWipeEffect = () => {
+        if (Date.now() >= state.wipeActiveUntil) return;
+        const character = getSelectedCharacter();
+        const { width, height } = canvas.getBoundingClientRect();
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadius = Math.hypot(width, height) * 0.6;
+        const progress = Math.min(
+          1,
+          (Date.now() - state.wipeStartTime) / settings.wipeDuration
+        );
+        const radius = maxRadius * progress;
+        const count = 14;
+        ctx.font = `${Math.max(18, width * 0.03)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let i = 0; i < count; i += 1) {
+          const angle = (Math.PI * 2 * i) / count + progress * Math.PI * 2;
+          ctx.fillText(
+            character.wipeEmoji,
+            centerX + Math.cos(angle) * radius,
+            centerY + Math.sin(angle) * radius
+          );
         }
       };
 
@@ -1494,6 +1571,7 @@
         drawClouds();
         drawBolts();
         drawSuns();
+        drawWipeEffect();
         drawPlayer();
         updateScore();
 
@@ -1592,6 +1670,7 @@
       const openProfile = () => {
         profileModal.classList.add("modal--open");
         profileModal.setAttribute("aria-hidden", "false");
+        profileNameInput.value = state.profileName;
       };
 
       const closeProfile = () => {
@@ -1654,11 +1733,14 @@
       };
 
       const useWipe = () => {
-        if (!state.running) return;
+        if (!state.running || state.wipeCharges < 1) return;
         const until = Date.now() + settings.wipeDuration;
         state.drops = [];
         state.rainPauseUntil = Math.max(state.rainPauseUntil, until);
         state.wipeActiveUntil = Math.max(state.wipeActiveUntil, until);
+        state.wipeStartTime = Date.now();
+        state.wipeCharges = Math.max(0, state.wipeCharges - 1);
+        updateWipeUI();
       };
 
       const useRevive = () => {
@@ -1718,7 +1800,7 @@
       closeGuideButton.addEventListener("click", closeGuide);
       closeProfileButton.addEventListener("click", closeProfile);
       profileNameInput.addEventListener("input", (event) => {
-        state.profileName = event.target.value.trim() || "게스트";
+        state.profileName = event.target.value;
         safeStorage.setItem(profileNameKey, state.profileName);
         updateProfileUI();
       });
