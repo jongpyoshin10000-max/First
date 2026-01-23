@@ -628,8 +628,8 @@
           <li>구름/필사기 사용 직후 1초 동안 비 생성량이 완만하게 조정됩니다.</li>
           <li><strong>⚡ 번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
           <li>번개는 노란색/초록색으로만 구분됩니다.</li>
-          <li>1000점 이후에는 비의 속도는 고정되고 비의 양만 증가합니다.</li>
-          <li><strong>☀️ 해</strong>: 레벨/비의 양은 유지되고 비의 속도만 이전 레벨 속도로 잠시 감소합니다.</li>
+          <li>800점 이후에는 비의 속도는 고정되고 비의 양만 증가합니다.</li>
+          <li><strong>☀️ 해</strong>: 일정 시간 동안 비의 속도를 느리게 감소시킨 뒤 원래 속도로 복귀합니다.</li>
         </ul>
       </div>
     </div>
@@ -744,6 +744,7 @@
         difficultyTier: 0,
         sunSpeedTierOverride: null,
         sunSpeedOverrideUntil: 0,
+        sunSlowUntil: 0,
         spawnGraceUntil: 0,
         wipeActiveUntil: 0,
         wipeStartTime: 0,
@@ -888,6 +889,8 @@
         cloudSlowFactor: 0.6,
         sunInterval: 15000,
         sunRadius: 9,
+        sunSlowFactor: 0.7,
+        sunSlowDuration: 8000,
         shieldMaxStack: 7,
         reviveCost: 500,
         umbrellaCost: 300,
@@ -975,6 +978,7 @@
         state.rainResumeSlowUntil = 0;
         state.sunSpeedTierOverride = null;
         state.sunSpeedOverrideUntil = 0;
+        state.sunSlowUntil = 0;
         state.spawnGraceUntil = 0;
         state.wipeActiveUntil = 0;
         state.wipeStartTime = 0;
@@ -1130,12 +1134,7 @@
         element.style.backgroundClip = "";
       };
 
-      const getSpeedTier = (baseTier) => {
-        if (Date.now() < state.sunSpeedOverrideUntil) {
-          return state.sunSpeedTierOverride ?? baseTier;
-        }
-        return baseTier;
-      };
+      const getSpeedTier = (baseTier) => baseTier;
 
       const lightenColor = (hex, amount) => {
         const value = hex.replace("#", "");
@@ -1298,7 +1297,7 @@
           state.wipeCharges += 1;
           state.nextWipeScore += settings.wipeChargeScore;
         }
-        const speedBaseTier = state.score > 1000 ? Math.floor(1000 / 200) : state.difficultyTier;
+        const speedBaseTier = state.score > 800 ? Math.floor(800 / 200) : state.difficultyTier;
         const speedTier = getSpeedTier(speedBaseTier);
         state.speedBonus = Math.pow(speedTier, 2) * settings.speedStep;
         const slowFactor =
@@ -1307,7 +1306,8 @@
             : 1;
         const cloudSlowFactor =
           Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
-        const totalSlowFactor = slowFactor * cloudSlowFactor;
+        const sunSlowFactor = Date.now() < state.sunSlowUntil ? settings.sunSlowFactor : 1;
+        const totalSlowFactor = slowFactor * cloudSlowFactor * sunSlowFactor;
         state.speedMultiplier = (1 + state.speedBonus) * totalSlowFactor;
         const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
         const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
@@ -1493,9 +1493,7 @@
             sun.x < player.x + size.width + settings.pickupPaddingX;
           const inY = sun.y > player.y - sun.radius && sun.y < player.y + size.height;
           if (inX && inY) {
-            const baseTier = Math.floor(state.score / 200);
-            state.sunSpeedTierOverride = Math.max(0, baseTier - 1);
-            state.sunSpeedOverrideUntil = Date.now() + 8000;
+            state.sunSlowUntil = Date.now() + settings.sunSlowDuration;
             return false;
           }
           return true;
