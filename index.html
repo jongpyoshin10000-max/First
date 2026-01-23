@@ -627,6 +627,8 @@
           <li><strong>☁️ 구름</strong>: 5초간 비를 멈추고, 이후 3초간 천천히 내립니다.</li>
           <li>구름/필사기 사용 직후 1초 동안 비 생성량이 완만하게 조정됩니다.</li>
           <li><strong>⚡ 번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
+          <li>번개는 노란색/초록색으로만 구분됩니다.</li>
+          <li>1000점 이후에는 비의 속도는 고정되고 비의 양만 증가합니다.</li>
           <li><strong>☀️ 해</strong>: 레벨/비의 양은 유지되고 비의 속도만 이전 레벨 속도로 잠시 감소합니다.</li>
         </ul>
       </div>
@@ -1128,11 +1130,11 @@
         element.style.backgroundClip = "";
       };
 
-      const getSpeedTier = () => {
+      const getSpeedTier = (baseTier) => {
         if (Date.now() < state.sunSpeedOverrideUntil) {
-          return state.sunSpeedTierOverride ?? state.difficultyTier;
+          return state.sunSpeedTierOverride ?? baseTier;
         }
-        return state.difficultyTier;
+        return baseTier;
       };
 
       const lightenColor = (hex, amount) => {
@@ -1296,7 +1298,8 @@
           state.wipeCharges += 1;
           state.nextWipeScore += settings.wipeChargeScore;
         }
-        const speedTier = getSpeedTier();
+        const speedBaseTier = state.score > 1000 ? Math.floor(1000 / 200) : state.difficultyTier;
+        const speedTier = getSpeedTier(speedBaseTier);
         state.speedBonus = Math.pow(speedTier, 2) * settings.speedStep;
         const slowFactor =
           Date.now() < state.slowUntil || Date.now() < state.rainResumeSlowUntil
@@ -1617,19 +1620,17 @@
       const drawBolts = () => {
         state.bolts.forEach((bolt) => {
           const color = bolt.type === "yellow" ? "#ffd400" : "#55ff7a";
-          ctx.strokeStyle = color;
-          ctx.lineWidth = 3;
+          ctx.fillStyle = color;
           ctx.beginPath();
           ctx.moveTo(bolt.x - 6, bolt.y - 12);
           ctx.lineTo(bolt.x + 2, bolt.y - 4);
           ctx.lineTo(bolt.x - 4, bolt.y + 2);
           ctx.lineTo(bolt.x + 6, bolt.y + 12);
-          ctx.stroke();
-          ctx.fillStyle = color;
-          ctx.font = `${bolt.radius * 1.6}px sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText("⚡", bolt.x, bolt.y);
+          ctx.lineTo(bolt.x + 1, bolt.y + 4);
+          ctx.lineTo(bolt.x + 4, bolt.y - 2);
+          ctx.lineTo(bolt.x - 2, bolt.y - 10);
+          ctx.closePath();
+          ctx.fill();
         });
       };
 
