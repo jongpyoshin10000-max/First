@@ -621,6 +621,7 @@
           <li>부활권을 사용하면 점수를 유지한 채 이어서 시작할 수 있습니다.</li>
           <li>프로필 설정에서 닉네임과 캐릭터를 변경할 수 있습니다.</li>
           <li><strong>🧹 필사기</strong>: 3초 동안 1초 간격으로 3회 퍼지며 비를 정리합니다. 시작 시 2회 제공되며 500점마다 1회 충전됩니다.</li>
+          <li>드래그바에서 이동 중 필사기 버튼 영역에 닿으면 즉시 발동됩니다.</li>
           <li>캐릭터: 회장님, 선생님, 공주, 슈퍼맨 중 선택할 수 있습니다.</li>
           <li><strong>🛡️ 보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
           <li><strong><span class="rainbow-emoji">☂️</span> 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
@@ -766,6 +767,8 @@
         countdownValue: 3,
         history: [],
         dragging: false,
+        dragPointerId: null,
+        wipeTriggeredThisDrag: false,
         pendingSlowStart: false,
         pendingPreserveScore: false,
         pendingReviveSelection: false,
@@ -1784,19 +1787,39 @@
 
       const handleDragStart = (event) => {
         if (!state.running) return;
+        if (event.target !== controlPad) return;
         state.dragging = true;
+        state.dragPointerId = event.pointerId ?? null;
+        state.wipeTriggeredThisDrag = false;
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         movePlayerFromX(clientX);
       };
 
       const handleDragMove = (event) => {
         if (!state.running || !state.dragging) return;
+        if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         movePlayerFromX(clientX);
+        if (!state.wipeTriggeredThisDrag) {
+          const rect = wipeButton.getBoundingClientRect();
+          const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+          const isInside =
+            clientX >= rect.left &&
+            clientX <= rect.right &&
+            clientY >= rect.top &&
+            clientY <= rect.bottom;
+          if (isInside) {
+            useWipe();
+            state.wipeTriggeredThisDrag = true;
+          }
+        }
       };
 
-      const handleDragEnd = () => {
+      const handleDragEnd = (event) => {
+        if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
         state.dragging = false;
+        state.dragPointerId = null;
+        state.wipeTriggeredThisDrag = false;
       };
 
       const toggleFullscreen = async () => {
@@ -1944,12 +1967,9 @@
 
       window.addEventListener("resize", resizeCanvas);
 
-      controlPad.addEventListener("mousedown", handleDragStart);
-      controlPad.addEventListener("mousemove", handleDragMove);
-      window.addEventListener("mouseup", handleDragEnd);
-      controlPad.addEventListener("touchstart", handleDragStart, { passive: true });
-      controlPad.addEventListener("touchmove", handleDragMove, { passive: true });
-      controlPad.addEventListener("touchend", handleDragEnd);
+      controlPad.addEventListener("pointerdown", handleDragStart);
+      controlPad.addEventListener("pointermove", handleDragMove);
+      window.addEventListener("pointerup", handleDragEnd);
       const handleStart = () => {
         if (state.pendingReviveSelection) {
           state.reviveTickets -= 1;
