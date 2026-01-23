@@ -769,6 +769,7 @@
         dragging: false,
         dragPointerId: null,
         wipeTriggeredThisDrag: false,
+        wipeHovering: false,
         pendingSlowStart: false,
         pendingPreserveScore: false,
         pendingReviveSelection: false,
@@ -1791,6 +1792,7 @@
         state.dragging = true;
         state.dragPointerId = event.pointerId ?? null;
         state.wipeTriggeredThisDrag = false;
+        state.wipeHovering = false;
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         movePlayerFromX(clientX);
       };
@@ -1800,18 +1802,21 @@
         if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         movePlayerFromX(clientX);
-        if (!state.wipeTriggeredThisDrag) {
-          const rect = wipeButton.getBoundingClientRect();
-          const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-          const isInside =
-            clientX >= rect.left &&
-            clientX <= rect.right &&
-            clientY >= rect.top &&
-            clientY <= rect.bottom;
-          if (isInside) {
-            useWipe();
-            state.wipeTriggeredThisDrag = true;
-          }
+        const rect = wipeButton.getBoundingClientRect();
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+        const isInside =
+          clientX >= rect.left &&
+          clientX <= rect.right &&
+          clientY >= rect.top &&
+          clientY <= rect.bottom;
+        if (!isInside) {
+          state.wipeHovering = false;
+          state.wipeTriggeredThisDrag = false;
+        }
+        if (isInside && !state.wipeHovering) {
+          useWipe();
+          state.wipeTriggeredThisDrag = true;
+          state.wipeHovering = true;
         }
       };
 
@@ -1820,6 +1825,7 @@
         state.dragging = false;
         state.dragPointerId = null;
         state.wipeTriggeredThisDrag = false;
+        state.wipeHovering = false;
       };
 
       const toggleFullscreen = async () => {
