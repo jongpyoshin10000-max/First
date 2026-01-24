@@ -1,0 +1,2065 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>비사이로 막가</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='drop' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237fd3ff'/%3E%3Cstop offset='1' stop-color='%233a7bd5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M32 4C22 18 14 28 14 40a18 18 0 0 0 36 0C50 28 42 18 32 4z' fill='url(%23drop)'/%3E%3C/svg%3E"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        background: #0b1020;
+        color: #e8f2ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: radial-gradient(circle at top, #1b2c52, #060910 70%);
+      }
+
+      .game {
+        width: min(960px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        height: 100%;
+      }
+
+      .game__header h1 {
+        margin: 0 0 4px;
+        font-size: clamp(1.8rem, 3vw, 2.6rem);
+      }
+
+      .game__header p {
+        margin: 0;
+        color: #c4d4f3;
+      }
+
+      .game__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .hud {
+        display: flex;
+        justify-content: space-between;
+        background: rgba(10, 16, 33, 0.7);
+        padding: 10px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-weight: 600;
+      }
+
+      .hud span {
+        color: #7fd3ff;
+      }
+
+      .hud__stats {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        text-align: right;
+        min-width: 120px;
+      }
+
+      .game__meta {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        font-size: 0.9rem;
+        color: #b7c6e6;
+        padding: 4px 8px 0;
+      }
+
+      .game__meta span {
+        color: #7fd3ff;
+        font-weight: 600;
+      }
+
+      .hud__stats--header {
+        background: rgba(10, 16, 33, 0.6);
+        border-radius: 12px;
+        padding: 8px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        text-align: left;
+      }
+
+      .stage {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        border-radius: 20px;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0b1b3a, #050610);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        text-align: center;
+        padding: 24px;
+        background: rgba(8, 10, 20, 0.8);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      .overlay--visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .overlay h2,
+      .result h2 {
+        margin: 0;
+        font-size: clamp(1.5rem, 3vw, 2.1rem);
+      }
+
+      .overlay p,
+      .result p {
+        margin: 0;
+        color: #d0ddf5;
+      }
+
+      .menu,
+      .result {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .menu--active,
+      .result--active {
+        display: flex;
+      }
+
+      .menu__actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .countdown {
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        font-weight: 800;
+        letter-spacing: 0.1em;
+      }
+
+      button {
+        border: none;
+        padding: 10px 18px;
+        border-radius: 999px;
+        font-size: 1rem;
+        font-weight: 700;
+        background: #62d2ff;
+        color: #0b1020;
+        cursor: pointer;
+        box-shadow: 0 8px 16px rgba(98, 210, 255, 0.25);
+      }
+
+      button:hover {
+        background: #8be0ff;
+      }
+
+      .button--ghost {
+        background: transparent;
+        color: #e8f2ff;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        box-shadow: none;
+      }
+
+      .button--ghost:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .game__footer {
+        color: #9eb2d6;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .game__footer-meta {
+        display: flex;
+        gap: 16px;
+        color: #b7c6e6;
+        font-size: 0.9rem;
+      }
+
+      .game__footer-meta span {
+        color: #7fd3ff;
+        font-weight: 600;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 12px;
+        }
+
+        .stage {
+          aspect-ratio: auto;
+          height: min(62vh, 420px);
+        }
+      }
+
+      :fullscreen body {
+        padding: 0;
+      }
+
+      :fullscreen .game {
+        height: 100vh;
+        padding: 16px;
+      }
+
+      :fullscreen .stage {
+        flex: 1;
+        height: auto;
+        max-height: none;
+      }
+
+      .control {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .control__row {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .action-bar {
+        display: flex;
+        justify-content: center;
+        justify-self: center;
+      }
+
+      .wipe-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+      }
+
+      .wipe-button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .control__label {
+        color: #b8c6e6;
+        font-size: 0.95rem;
+      }
+
+      .control__pad {
+        height: 80px;
+        border-radius: 16px;
+        background: rgba(98, 210, 255, 0.12);
+        border: 1px dashed rgba(98, 210, 255, 0.5);
+        position: relative;
+        touch-action: none;
+      }
+
+      .control__pad::after {
+        content: "";
+        position: absolute;
+        inset: 12px;
+        border-radius: 12px;
+        background: rgba(98, 210, 255, 0.08);
+      }
+
+      .status-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 0.95rem;
+        color: #cbd9f2;
+      }
+
+      .status-list__controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .status-list__message {
+        color: #9fb5e0;
+        font-size: 0.85rem;
+      }
+
+      .profile-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .profile-fields label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        color: #cfe1ff;
+        font-size: 0.95rem;
+      }
+
+      .profile-fields input {
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(9, 14, 28, 0.8);
+        color: #e8f2ff;
+        font-size: 1rem;
+      }
+
+      .character-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+      }
+
+      .character-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 10px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid transparent;
+        color: #e8f2ff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .character-button span {
+        font-size: 1.4rem;
+      }
+
+      .character-button--active {
+        border-color: #62d2ff;
+        box-shadow: 0 0 0 1px rgba(98, 210, 255, 0.4);
+      }
+
+      .shop-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        margin-top: 12px;
+        gap: 12px;
+      }
+
+      .shop-item button {
+        font-size: 0.9rem;
+        padding: 8px 14px;
+      }
+
+      .shop-message {
+        margin-top: 10px;
+        color: #9fb5e0;
+        min-height: 1.2em;
+      }
+
+      .guide-list {
+        margin: 0;
+        padding-left: 18px;
+        color: #cfe1ff;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .guide-list strong {
+        color: #7fd3ff;
+      }
+
+      .rainbow-emoji {
+        background: linear-gradient(90deg, #ff4d4f, #ffa940, #fadb14, #73d13d, #40a9ff, #9254de);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .modal {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: rgba(5, 8, 16, 0.75);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+      }
+
+      .modal--open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal__content {
+        width: min(520px, 100%);
+        background: #0e1426;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      .modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+
+      .modal__header h3 {
+        margin: 0;
+      }
+
+      .modal__close {
+        background: transparent;
+        color: #cfe1ff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: none;
+      }
+
+      .history-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+
+      .history-list li {
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        color: #d9e6ff;
+        font-size: 0.95rem;
+      }
+
+      .history-list span {
+        color: #7fd3ff;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game">
+      <header class="game__header">
+        <div>
+          <h1>비사이로 막가</h1>
+          <div class="game__footer-meta">
+            <div>닉네임: <span id="player-name">게스트</span></div>
+            <div>캐릭터: <span id="player-character">공주</span></div>
+          </div>
+        </div>
+        <div class="hud__stats hud__stats--header">
+          <div>레벨: <span id="level">1</span></div>
+          <div>비의 양: <span id="rain-amount">1</span></div>
+          <div>비의 속도: <span id="rain-speed">1.00</span></div>
+        </div>
+      </header>
+
+      <div class="hud">
+        <div>점수: <span id="score">0</span></div>
+        <div>최고기록: <span id="best">0</span></div>
+        <div>코인: <span id="currency">0</span></div>
+        <div>부활권: <span id="revive-status">0</span></div>
+        <div>보호막: <span id="shield-status">없음</span></div>
+        <div>우산: <span id="umbrella-status">0</span></div>
+      </div>
+
+      <div class="stage">
+        <canvas id="rain-canvas" aria-label="비사이로 막가 게임 화면"></canvas>
+        <div id="overlay" class="overlay overlay--visible">
+          <div id="menu" class="menu">
+            <h2>비사이로 막가</h2>
+            <p>비사이를 터치로 피하고 최대한 오래 버텨보세요.</p>
+            <div class="status-list">
+              <div>게임 머니: <span id="menu-currency">0</span>원</div>
+              <div>부활권: <span id="menu-tickets">0</span>개</div>
+              <div>우산 보유: <span id="menu-umbrella">0</span>개</div>
+              <div id="revive-message" class="status-list__message"></div>
+              <div class="status-list__controls">
+                <span>사용 우산</span>
+                <button id="umbrella-decrease" type="button" class="button--ghost">-</button>
+                <span id="umbrella-to-use">0</span>
+                <button id="umbrella-increase" type="button" class="button--ghost">+</button>
+              </div>
+            </div>
+            <div class="menu__actions">
+              <button id="start" type="button">게임 시작</button>
+              <button id="history" type="button" class="button--ghost">기록 보기</button>
+              <button id="shop" type="button" class="button--ghost">상점</button>
+              <button id="guide" type="button" class="button--ghost">게임설명</button>
+              <button id="profile" type="button" class="button--ghost">프로필 설정</button>
+              <button id="fullscreen" type="button" class="button--ghost">전체화면</button>
+            </div>
+          </div>
+          <div id="countdown" class="countdown" aria-live="polite"></div>
+          <div id="result" class="result">
+            <h2>비를 맞았어요!</h2>
+            <p>다시 시작해서 비사이를 가볍게 통과해봐요.</p>
+            <div class="menu__actions">
+              <button id="use-revive" type="button">부활권 사용</button>
+              <button id="restart" type="button">다시 도전</button>
+              <button id="back-to-menu" type="button" class="button--ghost">처음으로</button>
+              <button id="history-from-result" type="button" class="button--ghost">기록 보기</button>
+              <button id="shop-from-result" type="button" class="button--ghost">상점</button>
+              <button id="fullscreen-result" type="button" class="button--ghost">전체화면</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="control">
+        <div class="control__row">
+          <div class="control__label">여기에서 드래그하여 이동</div>
+          <div class="action-bar">
+            <button id="wipe" type="button" class="button--ghost wipe-button">
+              🧹 필사기 <span id="wipe-count">2</span>
+            </button>
+          </div>
+        </div>
+        <div id="control-pad" class="control__pad"></div>
+      </div>
+
+      <footer class="game__footer">
+        <p>팁: 하단 패드를 드래그해서 이동해보세요.</p>
+      </footer>
+    </div>
+
+    <div id="history-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>나의 기록</h3>
+          <button id="close-history" class="modal__close" type="button">닫기</button>
+        </div>
+        <ul id="history-list" class="history-list"></ul>
+      </div>
+    </div>
+
+    <div id="shop-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>상점</h3>
+          <button id="close-shop" class="modal__close" type="button">닫기</button>
+        </div>
+        <div class="shop-item">
+          <div>
+            <strong>부활권</strong>
+            <div>비를 맞아도 1회 부활</div>
+          </div>
+          <button id="buy-revive" type="button">500원 구매</button>
+        </div>
+        <div class="shop-item">
+          <div>
+            <strong>우산</strong>
+            <div>보호막과 같은 효과 (제한시간 없음)</div>
+          </div>
+          <button id="buy-umbrella" type="button">300원 구매</button>
+        </div>
+        <div id="shop-message" class="shop-message"></div>
+      </div>
+    </div>
+
+    <div id="guide-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>게임설명</h3>
+          <button id="close-guide" class="modal__close" type="button">닫기</button>
+        </div>
+        <ul class="guide-list">
+          <li>하단 패드에서 드래그하여 캐릭터를 이동합니다.</li>
+          <li>비를 피할수록 점수가 오르고, 점수는 게임 머니로 누적됩니다.</li>
+          <li>부활권을 사용하면 점수를 유지한 채 이어서 시작할 수 있습니다.</li>
+          <li>프로필 설정에서 닉네임과 캐릭터를 변경할 수 있습니다.</li>
+          <li><strong>🧹 필사기</strong>: 3초 동안 1초 간격으로 3회 퍼지며 비를 정리합니다. 시작 시 2회 제공되며 500점마다 1회 충전됩니다.</li>
+          <li>드래그바에서 이동 중 필사기 버튼 영역에 닿으면 즉시 발동됩니다.</li>
+          <li>캐릭터: 회장님, 선생님, 공주, 슈퍼맨 중 선택할 수 있습니다.</li>
+          <li><strong>🛡️ 보호막</strong>: 7단계까지 중첩되며 1회 피격을 막습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
+          <li><strong><span class="rainbow-emoji">☂️</span> 우산</strong>: 보호막과 동일하게 작동하지만 제한 시간이 없습니다. 7단계에서는 무지개색으로 표시됩니다.</li>
+          <li><strong>🪙 코인</strong>: 100/200/300/500원 가치로 떨어집니다.</li>
+          <li><strong>☁️ 구름</strong>: 5초간 비를 멈추고, 이후 3초간 천천히 내립니다.</li>
+          <li>구름/필사기 사용 직후 1초 동안 비 생성량이 완만하게 조정됩니다.</li>
+          <li><strong>⚡ 번개</strong>: 노란/초록 번개는 크기를 50/100/150%로 변경합니다.</li>
+          <li>번개는 노란색/초록색으로만 구분됩니다.</li>
+          <li>800점 이후에는 비의 속도는 고정되고 비의 양만 증가합니다.</li>
+          <li><strong>☀️ 해</strong>: 일정 시간 동안 비의 속도를 느리게 감소시킨 뒤 원래 속도로 복귀합니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="profile-modal" class="modal" aria-hidden="true" role="dialog">
+      <div class="modal__content">
+        <div class="modal__header">
+          <h3>프로필 설정</h3>
+          <button id="close-profile" class="modal__close" type="button">닫기</button>
+        </div>
+        <div class="profile-fields">
+          <label>
+            닉네임
+            <input id="profile-name" type="text" maxlength="12" placeholder="이름을 입력하세요" />
+          </label>
+          <div>
+            <div class="control__label">캐릭터 선택</div>
+            <div id="character-options" class="character-options"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const APP_VERSION = "2025-01-24-1";
+      const runApp = async () => {
+      const canvas = document.getElementById("rain-canvas");
+      const ctx = canvas.getContext("2d");
+      const overlay = document.getElementById("overlay");
+      const startButton = document.getElementById("start");
+      const restartButton = document.getElementById("restart");
+      const backToMenuButton = document.getElementById("back-to-menu");
+      const useReviveButton = document.getElementById("use-revive");
+      const historyButton = document.getElementById("history");
+      const historyFromResultButton = document.getElementById("history-from-result");
+      const shopFromResultButton = document.getElementById("shop-from-result");
+      const shopButton = document.getElementById("shop");
+      const guideButton = document.getElementById("guide");
+      const profileButton = document.getElementById("profile");
+      const guideModal = document.getElementById("guide-modal");
+      const closeGuideButton = document.getElementById("close-guide");
+      const profileModal = document.getElementById("profile-modal");
+      const closeProfileButton = document.getElementById("close-profile");
+      const profileNameInput = document.getElementById("profile-name");
+      const characterOptions = document.getElementById("character-options");
+      const shopModal = document.getElementById("shop-modal");
+      const closeShopButton = document.getElementById("close-shop");
+      const buyReviveButton = document.getElementById("buy-revive");
+      const buyUmbrellaButton = document.getElementById("buy-umbrella");
+      const shopMessage = document.getElementById("shop-message");
+      const fullscreenButton = document.getElementById("fullscreen");
+      const fullscreenResultButton = document.getElementById("fullscreen-result");
+      const controlPad = document.getElementById("control-pad");
+      const menu = document.getElementById("menu");
+      const countdownEl = document.getElementById("countdown");
+      const resultPanel = document.getElementById("result");
+      const historyModal = document.getElementById("history-modal");
+      const historyList = document.getElementById("history-list");
+      const closeHistory = document.getElementById("close-history");
+      const scoreEl = document.getElementById("score");
+      const bestEl = document.getElementById("best");
+      const currencyEl = document.getElementById("currency");
+      const reviveStatusEl = document.getElementById("revive-status");
+      const menuCurrencyEl = document.getElementById("menu-currency");
+      const menuTicketsEl = document.getElementById("menu-tickets");
+      const menuUmbrellaEl = document.getElementById("menu-umbrella");
+      const reviveMessageEl = document.getElementById("revive-message");
+      const umbrellaStatusEl = document.getElementById("umbrella-status");
+      const umbrellaToUseEl = document.getElementById("umbrella-to-use");
+      const umbrellaDecreaseButton = document.getElementById("umbrella-decrease");
+      const umbrellaIncreaseButton = document.getElementById("umbrella-increase");
+      const levelEl = document.getElementById("level");
+      const rainAmountEl = document.getElementById("rain-amount");
+      const rainSpeedEl = document.getElementById("rain-speed");
+      const shieldStatusEl = document.getElementById("shield-status");
+      const playerNameEl = document.getElementById("player-name");
+      const playerCharacterEl = document.getElementById("player-character");
+      const wipeButton = document.getElementById("wipe");
+      const wipeCountEl = document.getElementById("wipe-count");
+
+      const state = {
+        running: false,
+        drops: [],
+        shields: [],
+        coins: [],
+        clouds: [],
+        bolts: [],
+        suns: [],
+        player: {
+          x: 0,
+          y: 0,
+          width: 25,
+          height: 16,
+        },
+        lastTime: 0,
+        spawnTimer: 0,
+        shieldTimer: 0,
+        coinTimer: 0,
+        cloudTimer: 0,
+        boltTimer: 0,
+        sunTimer: 0,
+        score: 0,
+        best: 0,
+        currency: 0,
+        reviveTickets: 0,
+        umbrellaInventory: 0,
+        umbrellaActive: 0,
+        umbrellaToUse: 0,
+        speedMultiplier: 1,
+        dropsDodged: 0,
+        speedBonus: 0,
+        difficultyTier: 0,
+        sunSpeedTierOverride: null,
+        sunSpeedOverrideUntil: 0,
+        sunSlowUntil: 0,
+        spawnGraceUntil: 0,
+        wipeActiveUntil: 0,
+        wipeStartTime: 0,
+        wipeCharges: 2,
+        nextWipeScore: 500,
+        profileName: "게스트",
+        selectedCharacterId: "princess",
+        shieldActiveUntil: 0,
+        shieldCharges: 0,
+        sizeMultiplier: 1,
+        sizeEffectUntil: 0,
+        slowUntil: 0,
+        rainPauseUntil: 0,
+        rainResumeSlowUntil: 0,
+        revivesUsed: 0,
+        runAwardedScore: 0,
+        countdownTimer: null,
+        countdownValue: 3,
+        history: [],
+        dragging: false,
+        dragPointerId: null,
+        wipeTriggeredThisDrag: false,
+        wipeHovering: false,
+        pendingSlowStart: false,
+        pendingPreserveScore: false,
+        pendingReviveSelection: false,
+      };
+
+      const safeStorage = {
+        getItem(key) {
+          try {
+            return window.localStorage.getItem(key);
+          } catch (error) {
+            return null;
+          }
+        },
+        setItem(key, value) {
+          try {
+            window.localStorage.setItem(key, value);
+          } catch (error) {
+            return;
+          }
+        },
+      };
+
+      const versionKey = "rain-run-app-version";
+      const clearIndexedDB = async () => {
+        if (!window.indexedDB || !indexedDB.databases) return;
+        const databases = await indexedDB.databases();
+        await Promise.all(
+          databases.map((db) => {
+            if (!db.name) return Promise.resolve();
+            return new Promise((resolve) => {
+              const request = indexedDB.deleteDatabase(db.name);
+              request.onsuccess = () => resolve();
+              request.onerror = () => resolve();
+              request.onblocked = () => resolve();
+            });
+          })
+        );
+      };
+
+      const clearCaches = async () => {
+        if (!("caches" in window)) return;
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      };
+
+      const unregisterServiceWorkers = async () => {
+        if (!("serviceWorker" in navigator)) return;
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      };
+
+      const resetForVersionChange = async () => {
+        const storedVersion = safeStorage.getItem(versionKey);
+        if (storedVersion === APP_VERSION) {
+          return false;
+        }
+        if (storedVersion !== null) {
+          try {
+            window.localStorage.clear();
+          } catch (error) {
+            // Ignore storage clearing issues.
+          }
+          try {
+            window.sessionStorage?.clear();
+          } catch (error) {
+            // Ignore session storage clearing issues.
+          }
+          try {
+            safeStorage.setItem(versionKey, APP_VERSION);
+          } catch (error) {
+            // Ignore storage write issues.
+          }
+          await Promise.all([clearIndexedDB(), clearCaches(), unregisterServiceWorkers()]);
+          window.location.reload();
+          return true;
+        }
+        safeStorage.setItem(versionKey, APP_VERSION);
+        return false;
+      };
+
+      if (await resetForVersionChange()) {
+        return;
+      }
+
+      const bestScoreKey = "rain-run-best";
+      const historyKey = "rain-run-history";
+      const currencyKey = "rain-run-currency";
+      const reviveKey = "rain-run-revive";
+      const umbrellaKey = "rain-run-umbrella";
+      const profileNameKey = "rain-run-profile-name";
+      const profileCharacterKey = "rain-run-profile-character";
+      state.best = Number.parseFloat(safeStorage.getItem(bestScoreKey)) || 0;
+      state.history = JSON.parse(safeStorage.getItem(historyKey) || "[]");
+      const storedCurrency = safeStorage.getItem(currencyKey);
+      state.currency = storedCurrency === null ? 2000 : Number.parseInt(storedCurrency, 10) || 0;
+      state.reviveTickets = Number.parseInt(safeStorage.getItem(reviveKey), 10) || 0;
+      state.umbrellaInventory = Number.parseInt(safeStorage.getItem(umbrellaKey), 10) || 0;
+      const storedProfileName = safeStorage.getItem(profileNameKey);
+      state.profileName = storedProfileName ?? "게스트";
+      state.selectedCharacterId = safeStorage.getItem(profileCharacterKey) || "princess";
+
+      const settings = {
+        spawnInterval: 520,
+        minDropSpeed: 220,
+        maxDropSpeed: 420,
+        dropWidthRange: [4, 8],
+        dropHeight: 36,
+        speedStep: 0.04,
+        spawnScale: 0.2,
+        maxExtraDrops: 3,
+        shieldInterval: 9000,
+        shieldRadius: 12,
+        coinInterval: 7000,
+        coinRadius: 12,
+        coinValues: [100, 200, 300, 500],
+        cloudInterval: 12000,
+        boltInterval: 11000,
+        cloudRadius: 10,
+        boltRadius: 12,
+        boltDuration: 60000,
+        cloudSlowDuration: 3000,
+        cloudSlowFactor: 0.6,
+        sunInterval: 15000,
+        sunRadius: 9,
+        sunSlowFactor: 0.7,
+        sunSlowDuration: 8000,
+        shieldMaxStack: 7,
+        reviveCost: 500,
+        umbrellaCost: 300,
+        umbrellaMaxStack: 7,
+        slowDuration: 5000,
+        slowFactor: 0.6,
+        pickupPaddingX: 8,
+        wipeDuration: 3000,
+        wipeWaveInterval: 1000,
+        wipeChargeScore: 500,
+        wipeMaxCharges: 2,
+      };
+
+      const characters = [
+        { id: "chairman", name: "회장님", icon: "🕴️", wipeEmoji: "💸" },
+        { id: "teacher", name: "선생님", icon: "🏃‍♀️", wipeEmoji: "📚" },
+        { id: "princess", name: "공주", icon: "💃", wipeEmoji: "💖" },
+        { id: "general", name: "슈퍼맨", icon: "🦸‍♂️", wipeEmoji: "👊" },
+      ];
+
+      const showMenu = () => {
+        menu.classList.add("menu--active");
+        resultPanel.classList.remove("result--active");
+        countdownEl.textContent = "";
+        if (state.pendingReviveSelection) {
+          reviveMessageEl.textContent = "부활 시 사용할 우산 개수를 선택해주세요.";
+        } else {
+          reviveMessageEl.textContent = "";
+        }
+      };
+
+      const showResult = () => {
+        menu.classList.remove("menu--active");
+        resultPanel.classList.add("result--active");
+        countdownEl.textContent = "";
+        reviveMessageEl.textContent = "";
+      };
+
+      const showCountdown = (value) => {
+        menu.classList.remove("menu--active");
+        resultPanel.classList.remove("result--active");
+        countdownEl.textContent = value;
+        reviveMessageEl.textContent = "";
+      };
+
+      const resizeCanvas = () => {
+        const { width, height } = canvas.getBoundingClientRect();
+        canvas.width = width * window.devicePixelRatio;
+        canvas.height = height * window.devicePixelRatio;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        state.player.y = height - 40;
+        state.player.x = width / 2 - state.player.width / 2;
+      };
+
+      const resetGame = (options = {}) => {
+        const preserveScore = options.preserveScore ?? false;
+        state.drops = [];
+        if (!preserveScore) {
+          state.score = 0;
+          state.runAwardedScore = 0;
+        }
+        state.speedMultiplier = 1;
+        state.spawnTimer = 0;
+        state.shieldTimer = 0;
+        state.coinTimer = 0;
+        state.cloudTimer = 0;
+        state.boltTimer = 0;
+        if (!preserveScore) {
+          state.dropsDodged = 0;
+        }
+        state.speedBonus = 0;
+        state.difficultyTier = 0;
+        state.shields = [];
+        state.coins = [];
+        state.clouds = [];
+        state.bolts = [];
+        state.suns = [];
+        state.shieldActiveUntil = 0;
+        state.shieldCharges = 0;
+        state.umbrellaActive = 0;
+        state.sizeMultiplier = 1;
+        state.sizeEffectUntil = 0;
+        state.rainPauseUntil = 0;
+        state.rainResumeSlowUntil = 0;
+        state.sunSpeedTierOverride = null;
+        state.sunSpeedOverrideUntil = 0;
+        state.sunSlowUntil = 0;
+        state.spawnGraceUntil = 0;
+        state.wipeActiveUntil = 0;
+        state.wipeStartTime = 0;
+        if (!preserveScore) {
+          state.wipeCharges = settings.wipeMaxCharges;
+          state.nextWipeScore = settings.wipeChargeScore;
+        }
+        if (!preserveScore) {
+          state.revivesUsed = 0;
+        }
+        state.lastTime = performance.now();
+        updateScore();
+      };
+
+      const updateScore = () => {
+        scoreEl.textContent = Math.floor(state.score);
+        bestEl.textContent = Math.floor(state.best);
+      };
+
+      const updateCurrency = () => {
+        currencyEl.textContent = state.currency;
+        reviveStatusEl.textContent = state.reviveTickets;
+        menuCurrencyEl.textContent = state.currency;
+        menuTicketsEl.textContent = state.reviveTickets;
+        useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
+        menuUmbrellaEl.textContent = state.umbrellaInventory;
+        umbrellaStatusEl.textContent =
+          state.umbrellaActive > 0 ? state.umbrellaActive : state.umbrellaInventory;
+        if (state.umbrellaActive > 0) {
+          if (state.umbrellaActive >= settings.shieldMaxStack) {
+            applyRainbowText(umbrellaStatusEl);
+          } else {
+            clearRainbowText(umbrellaStatusEl);
+            umbrellaStatusEl.style.color = getShieldColor(state.umbrellaActive);
+          }
+        } else {
+          clearRainbowText(umbrellaStatusEl);
+          umbrellaStatusEl.style.color = "#7fd3ff";
+        }
+        umbrellaToUseEl.textContent = state.umbrellaToUse;
+      };
+
+      const setShopMessage = (text) => {
+        shopMessage.textContent = text;
+      };
+
+      const getSelectedCharacter = () =>
+        characters.find((character) => character.id === state.selectedCharacterId) ||
+        characters[2];
+
+      const renderCharacterOptions = () => {
+        characterOptions.innerHTML = "";
+        characters.forEach((character) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "character-button";
+          button.dataset.characterId = character.id;
+          button.innerHTML = `<span>${character.icon}</span>${character.name}`;
+          button.addEventListener("click", () => {
+            state.selectedCharacterId = character.id;
+            safeStorage.setItem(profileCharacterKey, character.id);
+            updateProfileUI();
+          });
+          characterOptions.appendChild(button);
+        });
+      };
+
+      const updateProfileUI = () => {
+        playerNameEl.textContent = state.profileName || "게스트";
+        const selected = getSelectedCharacter();
+        playerCharacterEl.textContent = selected.name;
+        if (document.activeElement !== profileNameInput) {
+          profileNameInput.value = state.profileName;
+        }
+        characterOptions.querySelectorAll(".character-button").forEach((button) => {
+          button.classList.toggle(
+            "character-button--active",
+            button.dataset.characterId === state.selectedCharacterId
+          );
+        });
+      };
+
+      const updateWipeUI = () => {
+        wipeCountEl.textContent = String(state.wipeCharges);
+        wipeButton.disabled = state.wipeCharges < 1 || !state.running;
+      };
+
+      const getShieldColor = (charges) => {
+        const palette = [
+          "#ff3b30",
+          "#ff9500",
+          "#ffd60a",
+          "#34c759",
+          "#32ade6",
+          "#5856d6",
+          "#af52de",
+        ];
+        return palette[Math.min(charges, palette.length) - 1] || "#ff3b30";
+      };
+
+      const updateShieldStatus = () => {
+        if (state.shieldCharges > 0) {
+          const remaining = Math.max(0, Math.ceil((state.shieldActiveUntil - Date.now()) / 1000));
+          shieldStatusEl.textContent = `${state.shieldCharges}개 · ${remaining}s`;
+          if (state.shieldCharges >= settings.shieldMaxStack) {
+            applyRainbowText(shieldStatusEl);
+          } else {
+            clearRainbowText(shieldStatusEl);
+            shieldStatusEl.style.color = getShieldColor(state.shieldCharges);
+          }
+          return;
+        }
+        shieldStatusEl.textContent = "없음";
+        clearRainbowText(shieldStatusEl);
+        shieldStatusEl.style.color = "#7fd3ff";
+      };
+
+      const updateRainStats = (difficultyTier, speedMultiplier) => {
+        levelEl.textContent = String(difficultyTier + 1);
+        const amount = 1 + Math.min(difficultyTier, settings.maxExtraDrops);
+        rainAmountEl.textContent = String(amount);
+        rainSpeedEl.textContent = speedMultiplier.toFixed(2);
+      };
+
+      const createRainbowGradient = (centerX, centerY, radius) => {
+        const gradient = ctx.createLinearGradient(
+          centerX - radius,
+          centerY - radius,
+          centerX + radius,
+          centerY + radius
+        );
+        gradient.addColorStop(0, "#ff4d4f");
+        gradient.addColorStop(0.17, "#ffa940");
+        gradient.addColorStop(0.33, "#fadb14");
+        gradient.addColorStop(0.5, "#73d13d");
+        gradient.addColorStop(0.67, "#40a9ff");
+        gradient.addColorStop(0.83, "#597ef7");
+        gradient.addColorStop(1, "#9254de");
+        return gradient;
+      };
+
+      const applyRainbowText = (element) => {
+        element.style.background =
+          "linear-gradient(90deg, #ff4d4f, #ffa940, #fadb14, #73d13d, #40a9ff, #597ef7, #9254de)";
+        element.style.webkitBackgroundClip = "text";
+        element.style.backgroundClip = "text";
+        element.style.color = "transparent";
+      };
+
+      const clearRainbowText = (element) => {
+        element.style.background = "";
+        element.style.webkitBackgroundClip = "";
+        element.style.backgroundClip = "";
+      };
+
+      const getSpeedTier = (baseTier) => baseTier;
+
+      const lightenColor = (hex, amount) => {
+        const value = hex.replace("#", "");
+        const num = Number.parseInt(value, 16);
+        const r = Math.min(255, ((num >> 16) & 0xff) + amount);
+        const g = Math.min(255, ((num >> 8) & 0xff) + amount);
+        const b = Math.min(255, (num & 0xff) + amount);
+        return `rgb(${r}, ${g}, ${b})`;
+      };
+
+      const startCountdown = (options = {}) => {
+        if (state.countdownTimer) {
+          clearInterval(state.countdownTimer);
+        }
+        state.pendingSlowStart = options.slowStart ?? false;
+        state.pendingPreserveScore = options.preserveScore ?? false;
+        state.pendingReviveSelection = false;
+        overlay.classList.add("overlay--visible");
+        state.countdownValue = 3;
+        showCountdown(state.countdownValue);
+        state.countdownTimer = setInterval(() => {
+          state.countdownValue -= 1;
+          if (state.countdownValue <= 0) {
+            clearInterval(state.countdownTimer);
+            state.countdownTimer = null;
+            overlay.classList.remove("overlay--visible");
+            startGame();
+            return;
+          }
+          showCountdown(state.countdownValue);
+        }, 1000);
+      };
+
+      const startGame = () => {
+        state.running = true;
+        resetGame({ preserveScore: state.pendingPreserveScore });
+        const usableUmbrellas = Math.min(state.umbrellaToUse, state.umbrellaInventory);
+        state.umbrellaInventory -= usableUmbrellas;
+        state.umbrellaActive = usableUmbrellas;
+        state.umbrellaToUse = 0;
+        safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
+        updateCurrency();
+        if (state.pendingSlowStart) {
+          state.slowUntil = Date.now() + settings.slowDuration;
+          state.pendingSlowStart = false;
+        }
+        state.pendingPreserveScore = false;
+        requestAnimationFrame(loop);
+      };
+
+      const endGame = () => {
+        state.running = false;
+        state.best = Math.max(state.best, state.score);
+        safeStorage.setItem(bestScoreKey, String(state.best));
+        const newAward = Math.max(0, Math.floor(state.score) - state.runAwardedScore);
+        state.currency += newAward;
+        state.runAwardedScore = Math.floor(state.score);
+        safeStorage.setItem(currencyKey, String(state.currency));
+        const runRecord = {
+          score: Math.floor(state.score),
+          drops: state.dropsDodged,
+          revives: state.revivesUsed,
+          date: new Date().toLocaleString(),
+        };
+        state.history.unshift(runRecord);
+        state.history = state.history.slice(0, 20);
+        safeStorage.setItem(historyKey, JSON.stringify(state.history));
+        updateScore();
+        updateCurrency();
+        useReviveButton.style.display = state.reviveTickets > 0 ? "inline-flex" : "none";
+        overlay.classList.add("overlay--visible");
+        showResult();
+      };
+
+      const spawnDrop = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const dropWidth =
+          settings.dropWidthRange[0] +
+          Math.random() *
+            (settings.dropWidthRange[1] - settings.dropWidthRange[0]);
+        state.drops.push({
+          x: Math.random() * (width - dropWidth),
+          y: -settings.dropHeight,
+          width: dropWidth,
+          height: settings.dropHeight,
+          speed:
+            settings.minDropSpeed +
+            Math.random() * (settings.maxDropSpeed - settings.minDropSpeed),
+        });
+      };
+
+      const spawnShield = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.shieldRadius;
+        state.shields.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 180 + Math.random() * 80,
+        });
+      };
+
+      const spawnCoin = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.coinRadius;
+        const value =
+          settings.coinValues[Math.floor(Math.random() * settings.coinValues.length)];
+        state.coins.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 200 + Math.random() * 80,
+          value,
+        });
+      };
+
+      const spawnCloud = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.cloudRadius;
+        state.clouds.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 140 + Math.random() * 60,
+        });
+      };
+
+      const spawnBolt = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.boltRadius;
+        const type = Math.random() > 0.5 ? "yellow" : "green";
+        state.bolts.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 220 + Math.random() * 80,
+          type,
+        });
+      };
+
+      const spawnSun = () => {
+        const { width } = canvas.getBoundingClientRect();
+        const radius = settings.sunRadius;
+        state.suns.push({
+          x: radius + Math.random() * (width - radius * 2),
+          y: -radius * 2,
+          radius,
+          speed: 160 + Math.random() * 60,
+        });
+      };
+
+      const update = (delta) => {
+        state.spawnTimer += delta;
+        state.score += delta * 0.01;
+        state.difficultyTier = Math.floor(state.score / 200);
+        while (
+          state.score >= state.nextWipeScore &&
+          state.wipeCharges < settings.wipeMaxCharges
+        ) {
+          state.wipeCharges += 1;
+          state.nextWipeScore += settings.wipeChargeScore;
+        }
+        const speedBaseTier = state.score > 800 ? Math.floor(800 / 200) : state.difficultyTier;
+        const speedTier = getSpeedTier(speedBaseTier);
+        state.speedBonus = Math.pow(speedTier, 2) * settings.speedStep;
+        const slowFactor =
+          Date.now() < state.slowUntil || Date.now() < state.rainResumeSlowUntil
+            ? settings.slowFactor
+            : 1;
+        const cloudSlowFactor =
+          Date.now() < state.rainResumeSlowUntil ? settings.cloudSlowFactor : 1;
+        const sunSlowFactor = Date.now() < state.sunSlowUntil ? settings.sunSlowFactor : 1;
+        const totalSlowFactor = slowFactor * cloudSlowFactor * sunSlowFactor;
+        state.speedMultiplier = (1 + state.speedBonus) * totalSlowFactor;
+        const intervalScale = 1 + state.difficultyTier * settings.spawnScale;
+        const spawnInterval = (settings.spawnInterval / intervalScale) / totalSlowFactor;
+        updateRainStats(state.difficultyTier, state.speedMultiplier);
+
+        const isRainPaused = Date.now() < state.rainPauseUntil;
+        if (isRainPaused) {
+          state.spawnTimer = 0;
+        }
+        if (!isRainPaused && state.spawnTimer > spawnInterval) {
+          state.spawnTimer -= spawnInterval;
+          spawnDrop();
+          let extraDrops = Math.min(state.difficultyTier, settings.maxExtraDrops);
+          if (Date.now() < state.spawnGraceUntil) {
+            extraDrops = Math.min(extraDrops, 1);
+          }
+          for (let i = 0; i < extraDrops; i += 1) {
+            spawnDrop();
+          }
+        }
+
+        state.shieldTimer += delta;
+        if (state.shieldTimer > settings.shieldInterval) {
+          state.shieldTimer -= settings.shieldInterval;
+          spawnShield();
+        }
+
+        state.coinTimer += delta;
+        if (state.coinTimer > settings.coinInterval) {
+          state.coinTimer -= settings.coinInterval;
+          spawnCoin();
+        }
+
+        state.cloudTimer += delta;
+        if (state.cloudTimer > settings.cloudInterval) {
+          state.cloudTimer -= settings.cloudInterval;
+          spawnCloud();
+        }
+
+        state.boltTimer += delta;
+        if (state.boltTimer > settings.boltInterval) {
+          state.boltTimer -= settings.boltInterval;
+          spawnBolt();
+        }
+
+        state.sunTimer += delta;
+        if (state.sunTimer > settings.sunInterval) {
+          state.sunTimer -= settings.sunInterval;
+          spawnSun();
+        }
+
+        if (!isRainPaused) {
+          state.drops.forEach((drop) => {
+            drop.y += (drop.speed * state.speedMultiplier * delta) / 1000;
+          });
+        }
+
+        state.shields.forEach((shield) => {
+          shield.y += (shield.speed * delta) / 1000;
+        });
+
+        state.coins.forEach((coin) => {
+          coin.y += (coin.speed * delta) / 1000;
+        });
+
+        state.clouds.forEach((cloud) => {
+          cloud.y += (cloud.speed * delta) / 1000;
+        });
+
+        state.bolts.forEach((bolt) => {
+          bolt.y += (bolt.speed * delta) / 1000;
+        });
+
+        state.suns.forEach((sun) => {
+          sun.y += (sun.speed * delta) / 1000;
+        });
+
+        const { height } = canvas.getBoundingClientRect();
+        state.drops = state.drops.filter((drop) => {
+          if (drop.y < height) {
+            return true;
+          }
+          state.dropsDodged += 1;
+          return false;
+        });
+
+        state.shields = state.shields.filter((shield) => shield.y < height + shield.radius);
+        state.coins = state.coins.filter((coin) => coin.y < height + coin.radius);
+        state.clouds = state.clouds.filter((cloud) => cloud.y < height + cloud.radius);
+        state.bolts = state.bolts.filter((bolt) => bolt.y < height + bolt.radius);
+        state.suns = state.suns.filter((sun) => sun.y < height + sun.radius);
+        if (state.shieldCharges > 0 && Date.now() > state.shieldActiveUntil) {
+          state.shieldCharges = 0;
+          state.shieldActiveUntil = 0;
+        }
+        if (state.sizeMultiplier !== 1 && Date.now() > state.sizeEffectUntil) {
+          state.sizeMultiplier = 1;
+          state.sizeEffectUntil = 0;
+        }
+        updateShieldStatus();
+        updateWipeUI();
+      };
+
+      const getPlayerSize = () => ({
+        width: state.player.width * state.sizeMultiplier,
+        height: state.player.height * state.sizeMultiplier,
+      });
+
+      const applyBoltEffect = (type) => {
+        if (type === "yellow") {
+          state.sizeMultiplier = state.sizeMultiplier >= 1.5 ? 1 : 0.5;
+        } else {
+          state.sizeMultiplier = state.sizeMultiplier <= 0.5 ? 1 : 1.5;
+        }
+        state.sizeEffectUntil = Date.now() + settings.boltDuration;
+      };
+
+      const checkCollision = () => {
+        const { player } = state;
+        const size = getPlayerSize();
+        state.shields = state.shields.filter((shield) => {
+          const inX =
+            shield.x > player.x - settings.pickupPaddingX &&
+            shield.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = shield.y > player.y - shield.radius && shield.y < player.y + size.height;
+          if (inX && inY) {
+            if (state.shieldCharges < settings.shieldMaxStack) {
+              state.shieldCharges += 1;
+              const baseTime = Math.max(Date.now(), state.shieldActiveUntil);
+              state.shieldActiveUntil = baseTime + 30000;
+            }
+            updateShieldStatus();
+            return false;
+          }
+          return true;
+        });
+
+        state.coins = state.coins.filter((coin) => {
+          const inX =
+            coin.x > player.x - settings.pickupPaddingX &&
+            coin.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = coin.y > player.y - coin.radius && coin.y < player.y + size.height;
+          if (inX && inY) {
+            state.currency += coin.value;
+            safeStorage.setItem(currencyKey, String(state.currency));
+            updateCurrency();
+            return false;
+          }
+          return true;
+        });
+
+        state.clouds = state.clouds.filter((cloud) => {
+          const inX =
+            cloud.x > player.x - settings.pickupPaddingX &&
+            cloud.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = cloud.y > player.y - cloud.radius && cloud.y < player.y + size.height;
+          if (inX && inY) {
+            state.rainPauseUntil = Date.now() + 5000;
+            state.rainResumeSlowUntil = state.rainPauseUntil + settings.cloudSlowDuration;
+            state.spawnGraceUntil = state.rainPauseUntil + 1000;
+            state.drops = [];
+            state.spawnTimer = 0;
+            return false;
+          }
+          return true;
+        });
+
+        state.bolts = state.bolts.filter((bolt) => {
+          const inX =
+            bolt.x > player.x - settings.pickupPaddingX &&
+            bolt.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = bolt.y > player.y - bolt.radius && bolt.y < player.y + size.height;
+          if (inX && inY) {
+            applyBoltEffect(bolt.type);
+            return false;
+          }
+          return true;
+        });
+
+        state.suns = state.suns.filter((sun) => {
+          const inX =
+            sun.x > player.x - settings.pickupPaddingX &&
+            sun.x < player.x + size.width + settings.pickupPaddingX;
+          const inY = sun.y > player.y - sun.radius && sun.y < player.y + size.height;
+          if (inX && inY) {
+            state.sunSlowUntil = Date.now() + settings.sunSlowDuration;
+            return false;
+          }
+          return true;
+        });
+
+        return state.drops.some((drop) => {
+          const dropBottom = drop.y + drop.height;
+          const playerBottom = player.y + size.height;
+          const isHit =
+            drop.x < player.x + size.width &&
+            drop.x + drop.width > player.x &&
+            dropBottom > player.y &&
+            drop.y < playerBottom;
+          if (!isHit) {
+            return false;
+          }
+          if (state.shieldCharges > 0) {
+            state.shieldCharges -= 1;
+            if (state.shieldCharges === 0) {
+              state.shieldActiveUntil = 0;
+            }
+            updateShieldStatus();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
+          if (state.umbrellaActive > 0) {
+            state.umbrellaActive -= 1;
+            updateCurrency();
+            drop.y = canvas.getBoundingClientRect().height + drop.height;
+            return false;
+          }
+          return true;
+        });
+      };
+
+      const drawBackground = () => {
+        const ratio = window.devicePixelRatio || 1;
+        const width = Math.ceil(canvas.width / ratio);
+        const height = Math.ceil(canvas.height / ratio);
+        ctx.clearRect(0, 0, width, height);
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        const brightness = Math.min(120, state.difficultyTier * 15);
+        gradient.addColorStop(0, lightenColor("#0d2247", brightness));
+        gradient.addColorStop(1, lightenColor("#04060c", brightness));
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+      };
+
+      const drawDrops = () => {
+        ctx.fillStyle = "#5fc9ff";
+        state.drops.forEach((drop) => {
+          const centerX = drop.x + drop.width / 2;
+          const topY = drop.y;
+          const bottomY = drop.y + drop.height;
+          ctx.beginPath();
+          ctx.moveTo(centerX, topY);
+          ctx.quadraticCurveTo(drop.x, topY + drop.height * 0.4, centerX, bottomY);
+          ctx.quadraticCurveTo(
+            drop.x + drop.width,
+            topY + drop.height * 0.4,
+            centerX,
+            topY
+          );
+          ctx.closePath();
+          ctx.fill();
+        });
+      };
+
+      const drawShields = () => {
+        state.shields.forEach((shield) => {
+          ctx.fillStyle = "#7dffea";
+          ctx.beginPath();
+          ctx.arc(shield.x, shield.y, shield.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#2bffe0";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = "#0b1020";
+          ctx.font = `${shield.radius * 1.4}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("🛡️", shield.x, shield.y + 1);
+        });
+      };
+
+      const drawCoins = () => {
+        state.coins.forEach((coin) => {
+          ctx.fillStyle = "#ffd26a";
+          ctx.beginPath();
+          ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffb703";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = "#1f1400";
+          ctx.font = `${coin.radius * 1.5}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("🪙", coin.x, coin.y);
+          ctx.fillStyle = "#1f1400";
+          ctx.font = "12px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(coin.value), coin.x, coin.y);
+        });
+      };
+
+      const drawClouds = () => {
+        state.clouds.forEach((cloud) => {
+          ctx.fillStyle = "#c8d8f2";
+          ctx.beginPath();
+          ctx.arc(cloud.x - 12, cloud.y, cloud.radius * 0.7, 0, Math.PI * 2);
+          ctx.arc(cloud.x + 2, cloud.y - 6, cloud.radius * 0.9, 0, Math.PI * 2);
+          ctx.arc(cloud.x + 16, cloud.y + 2, cloud.radius * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#4a5b7a";
+          ctx.font = `${cloud.radius * 1.6}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("☁️", cloud.x, cloud.y);
+        });
+      };
+
+      const drawBolts = () => {
+        state.bolts.forEach((bolt) => {
+          const color = bolt.type === "yellow" ? "#ffd400" : "#55ff7a";
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(bolt.x - 6, bolt.y - 12);
+          ctx.lineTo(bolt.x + 2, bolt.y - 4);
+          ctx.lineTo(bolt.x - 4, bolt.y + 2);
+          ctx.lineTo(bolt.x + 6, bolt.y + 12);
+          ctx.lineTo(bolt.x + 1, bolt.y + 4);
+          ctx.lineTo(bolt.x + 4, bolt.y - 2);
+          ctx.lineTo(bolt.x - 2, bolt.y - 10);
+          ctx.closePath();
+          ctx.fill();
+        });
+      };
+
+      const drawSuns = () => {
+        state.suns.forEach((sun) => {
+          ctx.fillStyle = "#ffd54f";
+          ctx.beginPath();
+          ctx.arc(sun.x, sun.y, sun.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#ffb300";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          for (let i = 0; i < 8; i += 1) {
+            const angle = (Math.PI * 2 * i) / 8;
+            const inner = sun.radius + 2;
+            const outer = sun.radius + 8;
+            ctx.beginPath();
+            ctx.moveTo(sun.x + Math.cos(angle) * inner, sun.y + Math.sin(angle) * inner);
+            ctx.lineTo(sun.x + Math.cos(angle) * outer, sun.y + Math.sin(angle) * outer);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#8a5a00";
+          ctx.font = `${sun.radius * 1.6}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("☀️", sun.x, sun.y + 1);
+        });
+      };
+
+      const drawPlayer = () => {
+        const { player } = state;
+        const size = getPlayerSize();
+        const character = getSelectedCharacter();
+        let umbrellaCenterX = 0;
+        let umbrellaCenterY = 0;
+        let umbrellaRadius = 0;
+        let umbrellaColor = "";
+        if (state.umbrellaActive > 0) {
+          umbrellaCenterX = player.x + size.width / 2;
+          umbrellaCenterY = player.y - 12;
+          umbrellaRadius = 18;
+          umbrellaColor =
+            state.umbrellaActive >= settings.shieldMaxStack
+              ? createRainbowGradient(umbrellaCenterX, umbrellaCenterY, umbrellaRadius)
+              : getShieldColor(state.umbrellaActive);
+          ctx.strokeStyle = umbrellaColor;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(umbrellaCenterX, umbrellaCenterY);
+          ctx.lineTo(umbrellaCenterX, player.y + 6);
+          ctx.stroke();
+        }
+        ctx.font = `${size.width * 1.4}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(
+          character.icon,
+          player.x + size.width / 2,
+          player.y + size.height / 2
+        );
+        if (state.shieldCharges > 0) {
+          const centerX = player.x + size.width / 2;
+          const centerY = player.y + size.height / 2;
+          const radius = Math.max(size.width, size.height) * 0.9;
+          ctx.strokeStyle =
+            state.shieldCharges >= settings.shieldMaxStack
+              ? createRainbowGradient(centerX, centerY, radius)
+              : getShieldColor(state.shieldCharges);
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        if (state.umbrellaActive > 0) {
+          ctx.strokeStyle = umbrellaColor;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius, Math.PI, 0);
+          ctx.stroke();
+          ctx.fillStyle = umbrellaColor;
+          ctx.beginPath();
+          ctx.arc(umbrellaCenterX, umbrellaCenterY, umbrellaRadius - 2, Math.PI, 0);
+          ctx.fill();
+        }
+      };
+
+      const drawWipeEffect = () => {
+        if (Date.now() >= state.wipeActiveUntil) return;
+        const character = getSelectedCharacter();
+        const { width, height } = canvas.getBoundingClientRect();
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadius = Math.hypot(width, height) * 0.6;
+        const elapsed = Date.now() - state.wipeStartTime;
+        const waveDuration = settings.wipeWaveInterval;
+        const waveIndex = Math.min(2, Math.floor(elapsed / waveDuration));
+        const waveProgress = Math.min(
+          1,
+          (elapsed - waveIndex * waveDuration) / waveDuration
+        );
+        const radius = maxRadius * waveProgress;
+        const count = 14;
+        ctx.font = `${Math.max(18, width * 0.03)}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let i = 0; i < count; i += 1) {
+          const angle =
+            (Math.PI * 2 * i) / count + (waveProgress + waveIndex) * Math.PI * 2;
+          ctx.fillText(
+            character.wipeEmoji,
+            centerX + Math.cos(angle) * radius,
+            centerY + Math.sin(angle) * radius
+          );
+        }
+      };
+
+      const loop = (time) => {
+        if (!state.running) return;
+        const delta = time - state.lastTime;
+        state.lastTime = time;
+
+        update(delta);
+        drawBackground();
+        drawDrops();
+        drawShields();
+        drawCoins();
+        drawClouds();
+        drawBolts();
+        drawSuns();
+        drawWipeEffect();
+        drawPlayer();
+        updateScore();
+
+        if (checkCollision()) {
+          endGame();
+          return;
+        }
+
+        requestAnimationFrame(loop);
+      };
+
+      const movePlayerFromX = (clientX) => {
+        const { width } = canvas.getBoundingClientRect();
+        const size = getPlayerSize();
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        state.player.x = Math.max(
+          0,
+          Math.min(width - size.width, x - size.width / 2)
+        );
+      };
+
+      const handleDragStart = (event) => {
+        if (!state.running) return;
+        if (event.target !== controlPad) return;
+        state.dragging = true;
+        state.dragPointerId = event.pointerId ?? null;
+        state.wipeTriggeredThisDrag = false;
+        state.wipeHovering = false;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        movePlayerFromX(clientX);
+      };
+
+      const handleDragMove = (event) => {
+        if (!state.running || !state.dragging) return;
+        if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
+        const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+        movePlayerFromX(clientX);
+        const rect = wipeButton.getBoundingClientRect();
+        const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+        const isInside =
+          clientX >= rect.left &&
+          clientX <= rect.right &&
+          clientY >= rect.top &&
+          clientY <= rect.bottom;
+        if (!isInside) {
+          state.wipeHovering = false;
+          state.wipeTriggeredThisDrag = false;
+        }
+        if (isInside && !state.wipeHovering) {
+          useWipe();
+          state.wipeTriggeredThisDrag = true;
+          state.wipeHovering = true;
+        }
+      };
+
+      const handleDragEnd = (event) => {
+        if (state.dragPointerId !== null && event.pointerId !== state.dragPointerId) return;
+        state.dragging = false;
+        state.dragPointerId = null;
+        state.wipeTriggeredThisDrag = false;
+        state.wipeHovering = false;
+      };
+
+      const toggleFullscreen = async () => {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+          return;
+        }
+        await document.documentElement.requestFullscreen();
+      };
+
+      const renderHistory = () => {
+        historyList.innerHTML = "";
+        if (!state.history.length) {
+          const emptyItem = document.createElement("li");
+          emptyItem.textContent = "아직 기록이 없어요.";
+          historyList.appendChild(emptyItem);
+          return;
+        }
+        state.history.forEach((record) => {
+          const item = document.createElement("li");
+          const revives = record.revives ? ` · 부활 ${record.revives}회` : "";
+          item.innerHTML = `<div>${record.date}</div><span>${record.score}점 · ${record.drops}회${revives}</span>`;
+          historyList.appendChild(item);
+        });
+      };
+
+      const openHistory = () => {
+        renderHistory();
+        historyModal.classList.add("modal--open");
+        historyModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeHistoryModal = () => {
+        historyModal.classList.remove("modal--open");
+        historyModal.setAttribute("aria-hidden", "true");
+      };
+
+      const openShop = () => {
+        setShopMessage("");
+        shopModal.classList.add("modal--open");
+        shopModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeShop = () => {
+        shopModal.classList.remove("modal--open");
+        shopModal.setAttribute("aria-hidden", "true");
+      };
+
+      const openGuide = () => {
+        guideModal.classList.add("modal--open");
+        guideModal.setAttribute("aria-hidden", "false");
+      };
+
+      const closeGuide = () => {
+        guideModal.classList.remove("modal--open");
+        guideModal.setAttribute("aria-hidden", "true");
+      };
+
+      const openProfile = () => {
+        profileModal.classList.add("modal--open");
+        profileModal.setAttribute("aria-hidden", "false");
+        profileNameInput.value = state.profileName;
+      };
+
+      const closeProfile = () => {
+        profileModal.classList.remove("modal--open");
+        profileModal.setAttribute("aria-hidden", "true");
+      };
+
+      const closeOpenModal = () => {
+        if (historyModal.classList.contains("modal--open")) {
+          closeHistoryModal();
+        }
+        if (shopModal.classList.contains("modal--open")) {
+          closeShop();
+        }
+        if (guideModal.classList.contains("modal--open")) {
+          closeGuide();
+        }
+        if (profileModal.classList.contains("modal--open")) {
+          closeProfile();
+        }
+      };
+
+      const buyRevive = () => {
+        if (state.currency < settings.reviveCost) {
+          setShopMessage("게임 머니가 부족합니다.");
+          return;
+        }
+        state.currency -= settings.reviveCost;
+        state.reviveTickets += 1;
+        safeStorage.setItem(currencyKey, String(state.currency));
+        safeStorage.setItem(reviveKey, String(state.reviveTickets));
+        updateCurrency();
+        setShopMessage("부활권을 구매했어요!");
+      };
+
+      const buyUmbrella = () => {
+        if (state.currency < settings.umbrellaCost) {
+          setShopMessage("게임 머니가 부족합니다.");
+          return;
+        }
+        if (state.umbrellaInventory >= settings.umbrellaMaxStack) {
+          setShopMessage("우산은 최대 7개까지 보유할 수 있어요.");
+          return;
+        }
+        state.currency -= settings.umbrellaCost;
+        state.umbrellaInventory += 1;
+        safeStorage.setItem(currencyKey, String(state.currency));
+        safeStorage.setItem(umbrellaKey, String(state.umbrellaInventory));
+        updateCurrency();
+        setShopMessage("우산을 구매했어요!");
+      };
+
+      const adjustUmbrellaToUse = (delta) => {
+        const next = Math.max(
+          0,
+          Math.min(state.umbrellaInventory, state.umbrellaToUse + delta)
+        );
+        state.umbrellaToUse = next;
+        updateCurrency();
+      };
+
+      const useWipe = () => {
+        if (!state.running || state.wipeCharges < 1) return;
+        const until = Date.now() + settings.wipeDuration;
+        state.drops = [];
+        state.rainPauseUntil = Math.max(state.rainPauseUntil, until);
+        state.spawnGraceUntil = Math.max(state.spawnGraceUntil, until + 1000);
+        state.wipeActiveUntil = Math.max(state.wipeActiveUntil, until);
+        state.wipeStartTime = Date.now();
+        state.wipeCharges = Math.max(0, state.wipeCharges - 1);
+        updateWipeUI();
+      };
+
+      const useRevive = () => {
+        if (state.reviveTickets < 1) return;
+        state.pendingReviveSelection = true;
+        state.umbrellaToUse = 0;
+        state.revivesUsed += 1;
+        updateCurrency();
+        overlay.classList.add("overlay--visible");
+        showMenu();
+      };
+
+      window.addEventListener("resize", resizeCanvas);
+
+      controlPad.addEventListener("pointerdown", handleDragStart);
+      controlPad.addEventListener("pointermove", handleDragMove);
+      window.addEventListener("pointerup", handleDragEnd);
+      const handleStart = () => {
+        if (state.pendingReviveSelection) {
+          state.reviveTickets -= 1;
+          safeStorage.setItem(reviveKey, String(state.reviveTickets));
+          updateCurrency();
+          startCountdown({ slowStart: true, preserveScore: true });
+          return;
+        }
+        startCountdown({ slowStart: false });
+      };
+
+      const handleBackToMenu = () => {
+        overlay.classList.add("overlay--visible");
+        showMenu();
+      };
+
+      startButton.addEventListener("click", handleStart);
+      startButton.addEventListener("touchstart", handleStart, { passive: true });
+      restartButton.addEventListener("click", () => startCountdown({ slowStart: true }));
+      restartButton.addEventListener("touchstart", () => startCountdown({ slowStart: true }), {
+        passive: true,
+      });
+      useReviveButton.addEventListener("click", useRevive);
+      backToMenuButton.addEventListener("click", handleBackToMenu);
+      umbrellaDecreaseButton.addEventListener("click", () => adjustUmbrellaToUse(-1));
+      umbrellaIncreaseButton.addEventListener("click", () => adjustUmbrellaToUse(1));
+      wipeButton.addEventListener("click", useWipe);
+      historyButton.addEventListener("click", openHistory);
+      historyFromResultButton.addEventListener("click", openHistory);
+      shopButton.addEventListener("click", openShop);
+      shopFromResultButton.addEventListener("click", openShop);
+      guideButton.addEventListener("click", openGuide);
+      profileButton.addEventListener("click", openProfile);
+      buyReviveButton.addEventListener("click", buyRevive);
+      buyUmbrellaButton.addEventListener("click", buyUmbrella);
+      closeShopButton.addEventListener("click", closeShop);
+      closeGuideButton.addEventListener("click", closeGuide);
+      closeProfileButton.addEventListener("click", closeProfile);
+      profileNameInput.addEventListener("input", (event) => {
+        state.profileName = event.target.value;
+        safeStorage.setItem(profileNameKey, state.profileName);
+        updateProfileUI();
+      });
+      shopModal.addEventListener("click", (event) => {
+        if (event.target === shopModal) {
+          closeShop();
+        }
+      });
+      guideModal.addEventListener("click", (event) => {
+        if (event.target === guideModal) {
+          closeGuide();
+        }
+      });
+      profileModal.addEventListener("click", (event) => {
+        if (event.target === profileModal) {
+          closeProfile();
+        }
+      });
+      fullscreenButton.addEventListener("click", toggleFullscreen);
+      fullscreenResultButton.addEventListener("click", toggleFullscreen);
+      closeHistory.addEventListener("click", closeHistoryModal);
+      window.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeOpenModal();
+        }
+      });
+      historyModal.addEventListener("click", (event) => {
+        if (event.target === historyModal) {
+          closeHistoryModal();
+        }
+      });
+
+      renderCharacterOptions();
+      updateProfileUI();
+      resizeCanvas();
+      updateScore();
+      updateCurrency();
+      updateShieldStatus();
+      updateRainStats(state.difficultyTier, state.speedMultiplier);
+      showMenu();
+      };
+      runApp();
+    </script>
+  </body>
+</html>
