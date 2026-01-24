@@ -1535,7 +1535,9 @@
       };
 
       const drawBackground = () => {
-        const { width, height } = canvas.getBoundingClientRect();
+        const ratio = window.devicePixelRatio || 1;
+        const width = Math.ceil(canvas.width / ratio);
+        const height = Math.ceil(canvas.height / ratio);
         ctx.clearRect(0, 0, width, height);
         const gradient = ctx.createLinearGradient(0, 0, 0, height);
         const brightness = Math.min(120, state.difficultyTier * 15);
